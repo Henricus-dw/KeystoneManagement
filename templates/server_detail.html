@@ -29,8 +29,8 @@
     <div class="sub" style="margin-top:10px">{% if server.shared %}Shared. Visible to the whole team.{% else %}Private. Only you can see this.{% endif %}</div></div>
 </div>
 
-{% set eye_icon %}<svg class="ico ico-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ico ico-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20C5 20 1 12 1 12a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>{% endset %}
-{% set copy_icon %}<svg class="ico ico-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="ico ico-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" hidden><path d="M20 6L9 17l-5-5"/></svg>{% endset %}
+{% set eye_icon %}<svg class="ico ico-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ico ico-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20C5 20 1 12 1 12a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>{% endset %}
+{% set copy_icon %}<svg class="ico ico-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="ico ico-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>{% endset %}
 
 {% macro conn_row(label, value) %}
 <div class="conn-row">
@@ -115,8 +115,14 @@
     border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted);
     cursor: pointer; transition: .15s; }
   .icon-btn:hover { border-color: rgba(28,196,216,.4); color: var(--teal); }
-  .icon-btn .ico { width: 16px; height: 16px; }
+  .icon-btn .ico { grid-area: 1 / 1; width: 16px; height: 16px; }
+  /* Only one icon of each pair is ever visible; JS toggles the state class. */
+  .icon-btn .ico-check, .icon-btn .ico-eye-off { display: none; }
   .icon-btn.copied { color: var(--teal-2); border-color: rgba(63,224,194,.4); }
+  .icon-btn.copied .ico-copy { display: none; }
+  .icon-btn.copied .ico-check { display: block; }
+  .icon-btn.revealed .ico-eye { display: none; }
+  .icon-btn.revealed .ico-eye-off { display: block; }
   .card.danger { border-color: rgba(244,103,122,.32); }
   .del summary { list-style: none; cursor: pointer; display: inline-flex; }
   .del summary::-webkit-details-marker { display: none; }
@@ -126,37 +132,33 @@
   (function () {
     var root = document.currentScript.closest("main") || document;
 
-    // Reveal / hide the secret, swapping the eye <-> eye-off icon.
+    // Reveal / hide the secret, alternating the eye <-> eye-off icon.
     root.querySelectorAll(".reveal").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var row = btn.closest(".conn-row");
         var dots = row.querySelector(".secret-dots");
         var plain = row.querySelector(".secret-plain");
-        var eye = btn.querySelector(".ico-eye");
-        var eyeOff = btn.querySelector(".ico-eye-off");
-        var showing = plain.hasAttribute("hidden");   // currently hidden -> about to show
+        var showing = btn.classList.toggle("revealed");
         plain.hidden = !showing;
         dots.hidden = showing;
-        eye.hidden = showing;
-        eyeOff.hidden = !showing;
         btn.title = showing ? "Hide" : "Show";
         btn.setAttribute("aria-label", showing ? "Hide password" : "Show password");
       });
     });
 
-    // Copy-to-clipboard: flash a check icon on success.
+    // Copy-to-clipboard: briefly swap the clipboard icon for a check on success.
     root.querySelectorAll(".copy").forEach(function (btn) {
+      var timer;
       btn.addEventListener("click", function () {
         var text = btn.getAttribute("data-copy");
         if (!navigator.clipboard) return;
         navigator.clipboard.writeText(text).then(function () {
-          var copy = btn.querySelector(".ico-copy");
-          var check = btn.querySelector(".ico-check");
           btn.classList.add("copied");
-          copy.hidden = true; check.hidden = false;
-          setTimeout(function () {
+          btn.title = "Copied";
+          clearTimeout(timer);
+          timer = setTimeout(function () {
             btn.classList.remove("copied");
-            copy.hidden = false; check.hidden = true;
+            btn.title = "Copy";
           }, 1200);
         });
       });

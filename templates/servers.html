@@ -14,16 +14,13 @@
 {% macro srv_row(s, owned) %}
 <a class="srv-row" href="/servers/{{ s.id }}">
   <div class="pname">
-    <b>{{ s.name }}</b>
+    <b>{{ s.name }}{% if owned and not s.shared %} <span class="tag-private">Private</span>{% endif %}</b>
     <span class="code">{{ s.code }} · {{ s.kind.value }}</span>
   </div>
   <div>{{ badge(s.environment) }}</div>
   <div class="mono dim" style="font-size:12.5px">{{ s.address or 'Not set' }}</div>
   <div class="row" style="gap:8px">
     {% if s.owner %}{{ avatar(s.owner, 'sm') }}<span class="dim" style="font-size:12.5px">{{ 'You' if owned else s.owner.name.split()[0] }}</span>{% else %}<span class="dim">Unknown</span>{% endif %}
-  </div>
-  <div style="text-align:right">
-    {% if s.shared %}<span class="badge s-on-track plain">Shared</span>{% else %}<span class="badge s-on-hold plain">Private</span>{% endif %}
   </div>
 </a>
 {% endmacro %}
@@ -33,7 +30,6 @@
 <div class="srv-row head">
   <div class="kicker">Name</div><div class="kicker">Environment</div>
   <div class="kicker">Host</div><div class="kicker">Owner</div>
-  <div class="kicker" style="text-align:right">Visibility</div>
 </div>
 {% for s in mine %}{{ srv_row(s, true) }}{% else %}
 <div class="empty-state">You haven't saved any servers yet. <a href="/servers/new" style="color:var(--teal)">Add one →</a><br>
@@ -46,7 +42,6 @@
 <div class="srv-row head">
   <div class="kicker">Name</div><div class="kicker">Environment</div>
   <div class="kicker">Host</div><div class="kicker">Owner</div>
-  <div class="kicker" style="text-align:right">Visibility</div>
 </div>
 {% for s in shared %}{{ srv_row(s, false) }}{% endfor %}
 {% else %}
@@ -55,14 +50,16 @@
 
 <style>
   .srv-row {
-    display: grid; grid-template-columns: 1.8fr 1fr 1.4fr 1fr 100px; align-items: center; gap: 16px;
+    display: grid; grid-template-columns: 1.8fr 1fr 1.4fr 1fr; align-items: center; gap: 16px;
     padding: 15px 20px; border: 1px solid var(--line); border-radius: var(--radius);
     background: linear-gradient(180deg, var(--surface), var(--bg-2)); transition: .15s; margin-bottom: 10px;
   }
   .srv-row:hover { border-color: rgba(28,196,216,.35); transform: translateY(-1px); }
   .srv-row .pname { display: flex; flex-direction: column; gap: 3px; }
-  .srv-row .pname b { font-family: var(--head); font-weight: 600; font-size: 15px; }
+  .srv-row .pname b { font-family: var(--head); font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
   .srv-row .pname .code { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .08em; }
+  .tag-private { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--dim); border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; }
   .srv-row.head { background: transparent; border: 0; box-shadow: none; padding-bottom: 0;
     margin-bottom: 4px; transform: none; }
   .srv-row.head:hover { border: 0; transform: none; }
