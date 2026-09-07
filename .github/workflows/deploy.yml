@@ -1,0 +1,21 @@
+name: Deploy Keystone
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 156.38.217.108
+          username: henridewitt
+          key: ${{ secrets.KEYSTONE_SSH_KEY }}
+          script: |
+            cd /var/www/keystone
+            git pull origin main
+            sudo systemctl restart keystone.service
