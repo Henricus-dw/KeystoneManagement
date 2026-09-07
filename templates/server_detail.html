@@ -146,13 +146,38 @@
       });
     });
 
-    // Copy-to-clipboard: briefly swap the clipboard icon for a check on success.
+    // Copy to clipboard. The async Clipboard API only exists in a secure
+    // context (HTTPS or localhost); this app is served over plain HTTP on a
+    // LAN IP, where navigator.clipboard is undefined, so fall back to a
+    // temporary <textarea> + execCommand("copy") which works over HTTP.
+    function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise(function (resolve, reject) {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.top = "-1000px";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        ok ? resolve() : reject();
+      });
+    }
+
+    // Briefly swap the clipboard icon for a check once the value is copied.
     root.querySelectorAll(".copy").forEach(function (btn) {
       var timer;
       btn.addEventListener("click", function () {
         var text = btn.getAttribute("data-copy");
-        if (!navigator.clipboard) return;
-        navigator.clipboard.writeText(text).then(function () {
+        copyText(text).then(function () {
           btn.classList.add("copied");
           btn.title = "Copied";
           clearTimeout(timer);
@@ -160,7 +185,7 @@
             btn.classList.remove("copied");
             btn.title = "Copy";
           }, 1200);
-        });
+        }).catch(function () { /* copy unsupported; leave the icon as-is */ });
       });
     });
   })();
