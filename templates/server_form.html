@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Server' if server else 'New Server' }}{% endblock %}
+{% block kicker %}Infrastructure{% endblock %}
+{% block heading %}{{ 'Edit Server' if server else 'New Server' }}{% endblock %}
+
+{% block topbar_actions %}
+<a class="btn sm" href="{{ '/servers/' ~ server.id if server else '/servers' }}">← Back</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ '/servers/' ~ server.id ~ '/edit' if server else '/servers' }}" style="max-width:920px">
+  <div class="grid cols-2" style="gap:22px;align-items:start">
+
+    <div class="card pad">
+      <div class="card-h"><div class="kicker">Details</div></div>
+      <label class="field"><span>Name</span>
+        <input name="name" required autofocus placeholder="Production Web 01"
+               value="{{ server.name if server else '' }}"></label>
+      <div class="grid cols-2" style="gap:12px 16px">
+        <label class="field"><span>Type</span>
+          <select name="kind">{% for k in kinds %}<option value="{{ k.value }}" {{ 'selected' if (server and server.kind == k) or (not server and k.value == 'Server') }}>{{ k.value }}</option>{% endfor %}</select></label>
+        <label class="field"><span>Environment</span>
+          <select name="environment">{% for e in envs %}<option value="{{ e.value }}" {{ 'selected' if (server and server.environment == e) or (not server and e.value == 'Production') }}>{{ e.value }}</option>{% endfor %}</select></label>
+        <label class="field"><span>Host / IP</span>
+          <input name="host" placeholder="10.0.0.14 or web01.internal"
+                 value="{{ server.host if server else '' }}"></label>
+        <label class="field"><span>Port</span>
+          <input name="port" inputmode="numeric" placeholder="22"
+                 value="{{ server.port if server and server.port else '' }}"></label>
+      </div>
+      <label class="field"><span>Management URL <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></span>
+        <input name="url" placeholder="https://panel.example.com"
+               value="{{ server.url if server else '' }}"></label>
+      <label class="field mb-0"><span>Notes</span>
+        <textarea name="notes" placeholder="How this box is used, gotchas, who to ask…">{{ server.notes if server else '' }}</textarea></label>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:22px">
+      <div class="card pad">
+        <div class="card-h"><div class="kicker">Credentials</div></div>
+        <label class="field"><span>Username</span>
+          <input name="username" autocomplete="off" placeholder="deploy"
+                 value="{{ server.username if server else '' }}"></label>
+        <label class="field mb-0"><span>Password / key</span>
+          <textarea name="secret" autocomplete="off" spellcheck="false"
+                    placeholder="{{ 'Leave blank to keep the current secret' if server else 'Password, API key or private key' }}"
+                    style="font-family:var(--mono);font-size:13px"></textarea></label>
+        {% if server %}<input type="hidden" name="keep_secret" value="1">
+        <p class="dim" style="font-size:11.5px;margin:8px 0 0">Leave blank to keep the existing secret.</p>{% endif %}
+        <p class="dim" style="font-size:11.5px;margin:10px 0 0;line-height:1.5">
+          Stored so the team can reach this resource. Secrets are masked in the app but
+          <b style="color:var(--gold)">not encrypted at rest</b> — don't store anything you wouldn't keep in an internal wiki.</p>
+      </div>
+
+      <div class="card pad">
+        <div class="card-h"><div class="kicker">Sharing</div></div>
+        <label class="switch">
+          <input type="checkbox" name="shared" value="1" {{ 'checked' if server and server.shared }}>
+          <span class="switch-track"></span>
+          <span class="switch-text"><b>Share with the team</b><small>Every signed-in user can view this entry. Leave off to keep it private to you.</small></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="row" style="gap:12px;margin-top:22px">
+    <button class="btn primary" type="submit">{{ 'Save changes' if server else 'Save server' }}</button>
+    <a class="btn" href="{{ '/servers/' ~ server.id if server else '/servers' }}">Cancel</a>
+  </div>
+</form>
+
+<style>
+  .switch { display:flex; align-items:flex-start; gap:12px; cursor:pointer; }
+  .switch input { display:none; }
+  .switch-track { flex:none; width:42px; height:24px; border-radius:999px; margin-top:2px;
+    background:var(--line); border:1px solid var(--line); position:relative; transition:.15s; }
+  .switch-track::after { content:""; position:absolute; top:2px; left:2px; width:18px; height:18px;
+    border-radius:50%; background:var(--muted); transition:.15s; }
+  .switch input:checked + .switch-track { background:rgba(28,196,216,.18); border-color:var(--teal); }
+  .switch input:checked + .switch-track::after { transform:translateX(18px); background:var(--teal); }
+  .switch-text b { font-family:var(--head); font-weight:600; font-size:14px; display:block; }
+  .switch-text small { color:var(--muted); font-size:12.5px; display:block; margin-top:3px; line-height:1.45; }
+</style>
+{% endblock %}

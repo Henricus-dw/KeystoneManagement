@@ -419,3 +419,15 @@ table.kt tr:hover td { background: rgba(28,196,216,.03); }
 .pick:hover .pick-chip { border-color: rgba(28,196,216,.4); color: var(--text); }
 .pick input:checked + .pick-chip { border-color: var(--teal); color: var(--text);
   background: rgba(28,196,216,.10); box-shadow: 0 0 0 1px rgba(28,196,216,.3) inset; }
+
+/* ---- Servers / infrastructure badges -------------------------- */
+.s-production { color: var(--red); border-color: rgba(244,103,122,.32); background: rgba(244,103,122,.08); }
+.s-staging { color: var(--gold); border-color: rgba(224,178,60,.34); background: rgba(224,178,60,.08); }
+/* .s-development reuses the existing teal slug */
+.s-server { color: var(--blue); border-color: rgba(124,156,245,.3); background: rgba(124,156,245,.08); }
+.s-virtual-machine { color: var(--violet); border-color: rgba(176,140,240,.32); background: rgba(176,140,240,.08); }
+.s-container { color: var(--teal-2); border-color: rgba(63,224,194,.3); background: rgba(63,224,194,.07); }
+.s-database { color: #6fb1bf; border-color: rgba(111,177,191,.34); background: rgba(111,177,191,.09); }
+.s-cloud { color: var(--blue); border-color: rgba(124,156,245,.3); background: rgba(124,156,245,.08); }
+.s-service { color: var(--teal); border-color: rgba(28,196,216,.32); background: rgba(28,196,216,.08); }
+.s-other { color: var(--dim); border-color: rgba(90,102,117,.3); background: rgba(90,102,117,.08); }

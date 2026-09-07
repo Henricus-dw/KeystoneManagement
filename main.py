@@ -6,7 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import APP_NAME, SECRET_KEY, SESSION_COOKIE, STATIC_DIR
 from app.deps import AuthRedirect
-from app.routers import api, auth, pages
+from app.routers import api, auth, pages, servers
 from app.seed import seed
 
 app = FastAPI(title=APP_NAME)
@@ -29,6 +29,7 @@ async def auth_redirect_handler(request: Request, exc: AuthRedirect):
 
 app.include_router(auth.router)
 app.include_router(pages.router)
+app.include_router(servers.router)
 app.include_router(api.router)
 
 

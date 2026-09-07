@@ -78,6 +78,25 @@ class TaskStatus(str, enum.Enum):
     done = "Done"
 
 
+class ServerKind(str, enum.Enum):
+    """What sort of resource an infrastructure entry describes."""
+
+    server = "Server"
+    vm = "Virtual Machine"
+    container = "Container"
+    database = "Database"
+    cloud = "Cloud"
+    service = "Service"
+    other = "Other"
+
+
+class ServerEnv(str, enum.Enum):
+    production = "Production"
+    staging = "Staging"
+    development = "Development"
+    other = "Other"
+
+
 # ---------------------------------------------------------------------------
 # Association tables
 # ---------------------------------------------------------------------------
@@ -272,3 +291,57 @@ class Attachment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     task: Mapped[Task] = relationship(back_populates="attachments")
+
+
+class Server(Base):
+    """
+    An infrastructure entry -- a server, VM, container, database, etc. -- plus
+    the details a developer needs to reach it.
+
+    Access model: a server is *private to its owner* when created. Setting
+    ``shared`` makes it visible (read-only) to every signed-in user, so the
+    team can use it as a shared reference. Only the owner or an Admin may edit,
+    share/unshare, or delete an entry.
+
+    NOTE: ``secret`` (password / key / access token) is stored in clear text --
+    there is no crypto dependency in this project. It is masked in the UI and
+    kept out of list views and the activity log, but it is NOT encrypted at
+    rest. See README for the follow-up to add encryption.
+    """
+
+    __tablename__ = "servers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    kind: Mapped[ServerKind] = mapped_column(Enum(ServerKind), default=ServerKind.server)
+    environment: Mapped[ServerEnv] = mapped_column(Enum(ServerEnv), default=ServerEnv.production)
+    host: Mapped[str] = mapped_column(String(255), default="")       # hostname or IP
+    port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    username: Mapped[str] = mapped_column(String(160), default="")
+    secret: Mapped[str] = mapped_column(Text, default="")            # password / key (see note)
+    url: Mapped[str] = mapped_column(String(400), default="")        # panel / management URL
+    notes: Mapped[str] = mapped_column(Text, default="")
+    shared: Mapped[bool] = mapped_column(default=False)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    owner: Mapped[User | None] = relationship("User", foreign_keys=[owner_id])
+
+    @property
+    def code(self) -> str:
+        return f"SV-{self.id:04d}"
+
+    @property
+    def address(self) -> str:
+        """host[:port] for display, or an empty string if no host is set."""
+        if not self.host:
+            return ""
+        return f"{self.host}:{self.port}" if self.port else self.host
+
+    def can_view(self, user: User) -> bool:
+        return self.shared or self.owner_id == user.id or user.role == UserRole.admin
+
+    def can_manage(self, user: User) -> bool:
+        """Edit / share / delete -- owner or Admin only."""
+        return self.owner_id == user.id or user.role == UserRole.admin
