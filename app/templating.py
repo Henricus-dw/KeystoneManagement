@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone
 
 from fastapi.templating import Jinja2Templates
 
+from app.changelog import APP_VERSION
 from app.config import APP_NAME, APP_TAGLINE, STATIC_DIR, TEMPLATES_DIR
 from app.models import (
     Priority,
@@ -86,6 +87,7 @@ templates.env.globals["asset_ver"] = _asset_ver
 templates.env.globals.update(
     APP_NAME=APP_NAME,
     APP_TAGLINE=APP_TAGLINE,
+    APP_VERSION=APP_VERSION,
     ProjectStatus=ProjectStatus,
     TaskStatus=TaskStatus,
     Priority=Priority,

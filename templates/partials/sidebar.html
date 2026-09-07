@@ -53,6 +53,12 @@
     {% endif %}
   </nav>
 
+  <a class="whatsnew {{ 'active' if nav == 'changelog' }}" href="/changelog" title="What's new">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l14-6v14L3 13z"/><path d="M8 13v4a1 1 0 0 0 1 1h1"/><path d="M17 8a3 3 0 0 1 0 6"/></svg>
+    <span>What's new</span>
+    <span class="ver">v{{ APP_VERSION }}</span>
+  </a>
+
   <div class="me">
     <div class="avatar" style="background: {{ user.accent }}">{{ user.initials }}</div>
     <a class="meta" href="/account" title="Account settings">

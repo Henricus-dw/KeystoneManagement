@@ -6,15 +6,17 @@
 
 {% block content %}
 {% if updated %}<div class="notice">Password updated.</div>{% endif %}
+{% if color_saved %}<div class="notice">Your colour was updated.</div>{% endif %}
 {% if error == 'wrong' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">Your current password is incorrect.</div>{% endif %}
 {% if error == 'short' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">New password must be at least 6 characters.</div>{% endif %}
 {% if error == 'mismatch' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">The new passwords don't match.</div>{% endif %}
+{% if error == 'color' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">That wasn't a valid colour.</div>{% endif %}
 
 <div class="grid" style="grid-template-columns:1fr 1fr;gap:22px;align-items:start;max-width:880px">
   <div class="card pad">
     <div class="card-h"><div class="kicker">Profile</div></div>
     <div class="row" style="gap:14px;margin-bottom:18px">
-      {{ avatar(user, 'lg') }}
+      <div class="avatar lg" id="avatarPreview" style="background: {{ user.accent }}" title="{{ user.name }}">{{ user.initials }}</div>
       <div>
         <b style="font-family:var(--head);font-size:16px;display:block">{{ user.name }}</b>
         <span class="dim mono" style="font-size:12px">{{ user.email }}</span>
@@ -26,7 +28,24 @@
     <div class="between" style="padding:9px 0;border-top:1px solid var(--line-soft)">
       <span class="dim mono" style="font-size:11px;letter-spacing:.1em">TITLE</span><span>{{ user.title }}</span>
     </div>
-    <p class="dim" style="font-size:12px;margin:14px 0 0">Name, email and role are managed by an administrator under Team Members.</p>
+
+    <div style="border-top:1px solid var(--line-soft);padding-top:14px;margin-top:9px">
+      <div class="kicker" style="margin-bottom:10px">Your colour</div>
+      <form method="post" action="/account/color" id="colorForm">
+        <div class="swatches">
+          {% for c in palette %}
+          <button type="button" class="swatch{{ ' on' if user.accent|upper == c|upper }}" data-color="{{ c }}" style="background:{{ c }}" title="{{ c }}" aria-label="Use {{ c }}"></button>
+          {% endfor %}
+        </div>
+        <div class="row" style="gap:10px;margin-top:13px">
+          <input type="color" name="accent" id="colorInput" value="{{ user.accent }}">
+          <span class="dim mono" id="colorHex" style="font-size:12px">{{ user.accent|upper }}</span>
+          <button class="btn sm primary" type="submit" style="margin-left:auto">Save colour</button>
+        </div>
+      </form>
+    </div>
+
+    <p class="dim" style="font-size:12px;margin:16px 0 0">Name, email and role are managed by an administrator under Team Members.</p>
   </div>
 
   <div class="card pad">
@@ -42,4 +61,36 @@
     </form>
   </div>
 </div>
+
+<style>
+  .swatches { display: flex; flex-wrap: wrap; gap: 9px; }
+  .swatch { width: 28px; height: 28px; border-radius: 8px; border: 2px solid transparent;
+    padding: 0; cursor: pointer; box-shadow: 0 0 0 1px var(--line) inset; transition: transform .12s; }
+  .swatch:hover { transform: translateY(-1px); }
+  .swatch.on { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg) inset; }
+  #colorInput { width: 46px; height: 36px; padding: 2px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--bg); cursor: pointer; }
+</style>
+<script>
+  (function () {
+    var input = document.getElementById("colorInput");
+    var av = document.getElementById("avatarPreview");
+    var hex = document.getElementById("colorHex");
+    var swatches = document.querySelectorAll(".swatch");
+    function apply(v) {
+      if (av) av.style.background = v;
+      if (hex) hex.textContent = v.toUpperCase();
+      swatches.forEach(function (s) {
+        s.classList.toggle("on", s.dataset.color.toUpperCase() === v.toUpperCase());
+      });
+    }
+    if (input) input.addEventListener("input", function () { apply(input.value); });
+    swatches.forEach(function (s) {
+      s.addEventListener("click", function () {
+        if (input) input.value = s.dataset.color;
+        apply(s.dataset.color);
+      });
+    });
+  })();
+</script>
 {% endblock %}

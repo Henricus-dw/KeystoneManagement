@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.changelog import CHANGELOG
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
 from app.reporting import build_activity_pdf
@@ -608,7 +609,9 @@ def account(request: Request, user: User = Depends(require_user)):
     return templates.TemplateResponse(request, "account.html", {
         "user": user, "nav": "account",
         "updated": request.query_params.get("pw") == "1",
+        "color_saved": request.query_params.get("color") == "1",
         "error": request.query_params.get("error"),
+        "palette": ACCENT_PALETTE,
     })
 
 
@@ -629,6 +632,46 @@ def change_password(
     user.password_hash = hash_password(new)
     db.commit()
     return RedirectResponse("/account?pw=1", status_code=303)
+
+
+# Preset avatar colours offered on the Account page (any hex is still allowed).
+ACCENT_PALETTE = ["#1CC4D8", "#3FE0C2", "#E0B23C", "#7C9CF5", "#B08CF0",
+                  "#F4677A", "#F0944C", "#6FB1BF", "#AEB9C7"]
+
+
+def _valid_hex(value: str) -> bool:
+    value = value.strip()
+    if len(value) != 7 or value[0] != "#":
+        return False
+    try:
+        int(value[1:], 16)
+        return True
+    except ValueError:
+        return False
+
+
+@router.post("/account/color")
+def change_color(
+    accent: str = Form(...),
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """Any signed-in user may change their own avatar colour."""
+    if not _valid_hex(accent):
+        return RedirectResponse("/account?error=color", status_code=303)
+    user.accent = accent.strip().upper()
+    db.commit()
+    return RedirectResponse("/account?color=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# What's new -- patch notes / changelog (any signed-in user)
+# ---------------------------------------------------------------------------
+@router.get("/changelog")
+def changelog_page(request: Request, user: User = Depends(require_user)):
+    return templates.TemplateResponse(request, "changelog.html", {
+        "user": user, "nav": "changelog", "entries": CHANGELOG,
+    })
 
 
 # ---------------------------------------------------------------------------
