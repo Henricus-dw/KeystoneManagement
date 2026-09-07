@@ -18,9 +18,9 @@
     <span class="code">{{ s.code }} · {{ s.kind.value }}</span>
   </div>
   <div>{{ badge(s.environment) }}</div>
-  <div class="mono dim" style="font-size:12.5px">{{ s.address or '—' }}</div>
+  <div class="mono dim" style="font-size:12.5px">{{ s.address or 'Not set' }}</div>
   <div class="row" style="gap:8px">
-    {% if s.owner %}{{ avatar(s.owner, 'sm') }}<span class="dim" style="font-size:12.5px">{{ 'You' if owned else s.owner.name.split()[0] }}</span>{% else %}<span class="dim">—</span>{% endif %}
+    {% if s.owner %}{{ avatar(s.owner, 'sm') }}<span class="dim" style="font-size:12.5px">{{ 'You' if owned else s.owner.name.split()[0] }}</span>{% else %}<span class="dim">Unknown</span>{% endif %}
   </div>
   <div style="text-align:right">
     {% if s.shared %}<span class="badge s-on-track plain">Shared</span>{% else %}<span class="badge s-on-hold plain">Private</span>{% endif %}
