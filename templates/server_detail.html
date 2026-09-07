@@ -19,15 +19,9 @@
 {% if request.query_params.get('error') == 'forbidden' %}
 <div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">You don't have permission to do that.</div>
 {% endif %}
-{% if request.query_params.get('img_error') == 'type' %}
-<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">That file isn't a supported image (use PNG, JPG, WebP or GIF).</div>
-{% endif %}
-{% if request.query_params.get('img_error') == 'size' %}
-<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">That image is too large (max 5&nbsp;MB).</div>
-{% endif %}
 
 {% if server.image %}
-<div class="srv-banner" style="background-image:url('/servers/{{ server.id }}/image')"></div>
+<img class="srv-square" src="/servers/{{ server.id }}/image" alt="Cover image for {{ server.name }}">
 {% endif %}
 
 <div class="grid cols-4" style="margin-bottom:22px">
@@ -90,30 +84,6 @@
 </div>
 {% endif %}
 
-{% if can_manage %}
-<div class="card pad" style="margin-bottom:22px;max-width:820px">
-  <div class="card-h"><div class="kicker">Image</div></div>
-
-  <img class="srv-img-preview" id="imgPreview" alt="Cover image for {{ server.name }}"
-       src="{{ '/servers/' ~ server.id ~ '/image' if server.image else '' }}"{{ '' if server.image else ' hidden' }}>
-  <div class="img-empty" id="imgEmpty"{% if server.image %} hidden{% endif %}>No image yet.</div>
-
-  <form method="post" action="/servers/{{ server.id }}/image" enctype="multipart/form-data"
-        class="row" id="imgForm" style="gap:10px;margin-top:12px;flex-wrap:wrap">
-    <label class="btn sm file-btn">Choose image<input type="file" name="image" id="imgInput"
-           accept="image/png,image/jpeg,image/webp,image/gif" required></label>
-    <span class="dim mono" id="fileName" style="font-size:12px"></span>
-    <button class="btn sm primary" type="submit" style="margin-left:auto">{{ 'Replace' if server.image else 'Upload' }}</button>
-  </form>
-  {% if server.image %}
-  <form method="post" action="/servers/{{ server.id }}/image/delete" style="margin-top:10px">
-    <button class="btn sm danger-btn" type="submit">Remove image</button>
-  </form>
-  {% endif %}
-  <p class="dim" style="font-size:11.5px;margin:12px 0 0">PNG, JPG, WebP or GIF, up to 5&nbsp;MB.</p>
-</div>
-{% endif %}
-
 <div class="dim mono" style="font-size:11px">Added {{ server.created_at|stamp }}{% if server.updated_at and server.updated_at != server.created_at %} · updated {{ server.updated_at|stamp }}{% endif %}</div>
 
 {% if can_manage %}
@@ -157,16 +127,9 @@
   .icon-btn.copied .ico-check { display: block; }
   .icon-btn.revealed .ico-eye { display: none; }
   .icon-btn.revealed .ico-eye-off { display: block; }
-  .srv-banner { height: 200px; max-width: 820px; margin-bottom: 22px; border-radius: var(--radius);
-    border: 1px solid var(--line); background-size: cover; background-position: center;
-    background-color: var(--bg-2); }
-  .srv-img-preview { display: block; max-width: 320px; width: 100%; border-radius: 10px;
-    border: 1px solid var(--line); }
-  .srv-img-preview[hidden] { display: none; }   /* override .srv-img-preview's display */
-  .img-empty { max-width: 320px; height: 120px; display: grid; place-items: center;
-    border: 1px dashed var(--line); border-radius: 10px; color: var(--dim); font-size: 12.5px; }
-  .file-btn { position: relative; overflow: hidden; cursor: pointer; }
-  .file-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .srv-square { display: block; width: 100%; max-width: 260px; aspect-ratio: 1 / 1;
+    object-fit: cover; border-radius: 14px; border: 1px solid var(--line);
+    background-color: var(--bg-2); margin-bottom: 22px; }
   .card.danger { border-color: rgba(244,103,122,.32); }
   .del summary { list-style: none; cursor: pointer; display: inline-flex; }
   .del summary::-webkit-details-marker { display: none; }
@@ -232,24 +195,6 @@
         }).catch(function () { /* copy unsupported; leave the icon as-is */ });
       });
     });
-
-    // Image picker: show the chosen file's name and a live preview before upload.
-    var imgInput = document.getElementById("imgInput");
-    if (imgInput) {
-      var preview = document.getElementById("imgPreview");
-      var empty = document.getElementById("imgEmpty");
-      var fileName = document.getElementById("fileName");
-      imgInput.addEventListener("change", function () {
-        var file = imgInput.files && imgInput.files[0];
-        if (!file) { if (fileName) fileName.textContent = ""; return; }
-        if (fileName) fileName.textContent = file.name;
-        if (preview) {
-          preview.src = URL.createObjectURL(file);
-          preview.hidden = false;
-        }
-        if (empty) empty.hidden = true;
-      });
-    }
   })();
 </script>
 {% endblock %}

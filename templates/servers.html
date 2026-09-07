@@ -21,10 +21,10 @@
     {% endif %}
   </div>
   <div class="srv-info">
-    <div>{{ badge(s.environment) }}</div>
     <b class="srv-title">{{ s.name }}</b>
-    <div class="srv-owner">
-      {% if s.owner %}{{ avatar(s.owner, 'sm') }}<span class="dim">{{ 'You' if owned else s.owner.name }}</span>{% else %}<span class="dim">Unknown owner</span>{% endif %}
+    <div class="srv-foot">
+      <div>{{ badge(s.environment) }}</div>
+      {% if s.owner %}{{ avatar(s.owner, 'sm') }}{% endif %}
     </div>
   </div>
 </a>
@@ -57,17 +57,18 @@
     border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); transition: .15s; }
   .srv-card:hover { border-color: rgba(28,196,216,.4); transform: translateY(-2px);
     box-shadow: 0 12px 30px -16px rgba(0,0,0,.7); }
-  .srv-cover { position: relative; height: 138px; background-color: var(--bg-2);
+  .srv-cover { position: relative; height: 152px; background-color: var(--bg-2);
     background-size: cover; background-position: center; }
-  /* Fade the image into the card so the info sits on a clean ground. */
+  /* Gentle, late fade so the image eases into the card instead of cutting off. */
   .srv-cover::after { content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, transparent 35%, var(--surface) 100%); }
+    background: linear-gradient(180deg, rgba(28,36,51,0) 55%, rgba(28,36,51,.55) 80%, rgba(28,36,51,1) 100%); }
   .srv-cover-ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--line);
     background: linear-gradient(140deg, var(--bg-2), var(--surface)); }
   .srv-cover-ph svg { width: 46px; height: 46px; opacity: .5; }
-  .srv-info { position: relative; z-index: 1; margin-top: -32px; padding: 0 15px 15px;
-    display: flex; flex-direction: column; gap: 8px; }
-  .srv-title { font-family: var(--head); font-weight: 600; font-size: 15.5px; line-height: 1.25; }
-  .srv-owner { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .srv-info { position: relative; z-index: 1; margin-top: -22px; padding: 0 15px 15px;
+    display: flex; flex-direction: column; gap: 12px; }
+  .srv-title { font-family: var(--head); font-weight: 600; font-size: 15.5px; line-height: 1.25;
+    text-shadow: 0 1px 10px rgba(0,0,0,.55); }
+  .srv-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 </style>
 {% endblock %}

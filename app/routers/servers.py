@@ -270,15 +270,15 @@ async def upload_image(server_id: int, image: UploadFile = File(...),
 
     spec = ALLOWED_IMAGES.get(image.content_type)
     if not spec:
-        return RedirectResponse(f"/servers/{server_id}?img_error=type", status_code=303)
+        return RedirectResponse(f"/servers/{server_id}/edit?img_error=type", status_code=303)
     ext, magic = spec
 
     data = await image.read(MAX_IMAGE_BYTES + 1)
     if len(data) > MAX_IMAGE_BYTES:
-        return RedirectResponse(f"/servers/{server_id}?img_error=size", status_code=303)
+        return RedirectResponse(f"/servers/{server_id}/edit?img_error=size", status_code=303)
     if not data or not data.startswith(magic):
         # empty, or the bytes don't match the claimed image type
-        return RedirectResponse(f"/servers/{server_id}?img_error=type", status_code=303)
+        return RedirectResponse(f"/servers/{server_id}/edit?img_error=type", status_code=303)
 
     SERVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     _delete_image_file(server)  # drop any previous file
@@ -288,7 +288,7 @@ async def upload_image(server_id: int, image: UploadFile = File(...),
     log_activity(db, user=user, verb="updated",
                  summary=f'updated the image for "{server.name}"')
     db.commit()
-    return RedirectResponse(f"/servers/{server_id}", status_code=303)
+    return RedirectResponse(f"/servers/{server_id}/edit", status_code=303)
 
 
 @router.post("/servers/{server_id}/image/delete")
@@ -301,7 +301,7 @@ def delete_image(server_id: int, user: User = Depends(require_user), db: Session
     _delete_image_file(server)
     server.image = ""
     db.commit()
-    return RedirectResponse(f"/servers/{server_id}", status_code=303)
+    return RedirectResponse(f"/servers/{server_id}/edit", status_code=303)
 
 
 # ---------------------------------------------------------------------------
