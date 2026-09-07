@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, badge %}
+{% block title %}Account{% endblock %}
+{% block kicker %}Your account{% endblock %}
+{% block heading %}Account Settings{% endblock %}
+
+{% block content %}
+{% if updated %}<div class="notice">Password updated.</div>{% endif %}
+{% if error == 'wrong' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">Your current password is incorrect.</div>{% endif %}
+{% if error == 'short' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">New password must be at least 6 characters.</div>{% endif %}
+{% if error == 'mismatch' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">The new passwords don't match.</div>{% endif %}
+
+<div class="grid" style="grid-template-columns:1fr 1fr;gap:22px;align-items:start;max-width:880px">
+  <div class="card pad">
+    <div class="card-h"><div class="kicker">Profile</div></div>
+    <div class="row" style="gap:14px;margin-bottom:18px">
+      {{ avatar(user, 'lg') }}
+      <div>
+        <b style="font-family:var(--head);font-size:16px;display:block">{{ user.name }}</b>
+        <span class="dim mono" style="font-size:12px">{{ user.email }}</span>
+      </div>
+    </div>
+    <div class="between" style="padding:9px 0;border-top:1px solid var(--line-soft)">
+      <span class="dim mono" style="font-size:11px;letter-spacing:.1em">ROLE</span>{{ badge(user.role, outline=true) }}
+    </div>
+    <div class="between" style="padding:9px 0;border-top:1px solid var(--line-soft)">
+      <span class="dim mono" style="font-size:11px;letter-spacing:.1em">TITLE</span><span>{{ user.title }}</span>
+    </div>
+    <p class="dim" style="font-size:12px;margin:14px 0 0">Name, email and role are managed by an administrator under Team Members.</p>
+  </div>
+
+  <div class="card pad">
+    <div class="card-h"><div class="kicker">Change password</div></div>
+    <form method="post" action="/account/password">
+      <label class="field"><span>Current password</span>
+        <input type="password" name="current" required autocomplete="current-password"></label>
+      <label class="field"><span>New password</span>
+        <input type="password" name="new" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters"></label>
+      <label class="field"><span>Confirm new password</span>
+        <input type="password" name="confirm" required autocomplete="new-password"></label>
+      <button class="btn primary" type="submit" style="width:100%">Update password</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

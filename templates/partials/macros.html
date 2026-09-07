@@ -1,0 +1,14 @@
+{% macro badge(value, outline=false) -%}
+<span class="badge s-{{ value|slug }}{{ ' outline' if outline }}">{{ value.value }}</span>
+{%- endmacro %}
+
+{% macro avatar(member, size='') -%}
+<div class="avatar {{ size }}" style="background: {{ member.accent }}" title="{{ member.name }}">{{ member.initials }}</div>
+{%- endmacro %}
+
+{% macro stack(members, limit=4) -%}
+<div class="avatar-stack">
+  {% for m in members[:limit] %}{{ avatar(m, 'sm') }}{% endfor %}
+  {% if members|length > limit %}<div class="avatar sm" style="background:var(--surface-2);color:var(--muted)">+{{ members|length - limit }}</div>{% endif %}
+</div>
+{%- endmacro %}

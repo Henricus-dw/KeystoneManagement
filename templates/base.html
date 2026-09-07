@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}{{ APP_NAME }}{% endblock %} · {{ APP_NAME }}</title>
+  <link rel="icon" href="/static/img/favicon.webp" type="image/webp" />
+  <link rel="stylesheet" href="/static/css/keystone.css?v={{ asset_ver('css/keystone.css') }}" />
+  {% block head %}{% endblock %}
+</head>
+<body class="app">
+  <div class="shell">
+    {% include "partials/sidebar.html" %}
+    <div class="main">
+      <header class="topbar">
+        <div class="page-title">
+          <div class="kicker">{% block kicker %}{{ APP_NAME }}{% endblock %}</div>
+          <h1>{% block heading %}{% endblock %}</h1>
+        </div>
+        <div class="spacer"></div>
+        {% block topbar_actions %}{% endblock %}
+      </header>
+      <main class="content">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, badge %}
+{% block title %}Team{% endblock %}
+{% block kicker %}People{% endblock %}
+{% block heading %}Team View{% endblock %}
+
+{% block content %}
+<div class="grid cols-3">
+  {% for member, b in cards %}
+  <div class="card team-card">
+    <div class="who">
+      {{ avatar(member, 'lg') }}
+      <div>
+        <b>{{ member.name }}</b>
+        <small>{{ member.title }} · {{ member.handle }}</small>
+      </div>
+      <div style="margin-left:auto">{{ badge(member.role, outline=true) }}</div>
+    </div>
+
+    <div class="row" style="gap:18px;font-size:12px">
+      <span class="dim"><b class="mono" style="color:var(--teal)">{{ b.open_count }}</b> open</span>
+      <span class="dim"><b class="mono" style="color:var(--red)">{{ b.blocked|length }}</b> blocked</span>
+      <span class="dim"><b class="mono" style="color:var(--teal-2)">{{ b.completed_today|length }}</b> done today</span>
+    </div>
+
+    <div class="team-sect">
+      <div class="lbl">Working on</div>
+      <ul>
+        {% for t in b.working %}<li><a href="/tasks/{{ t.id }}">{{ t.title }}</a></li>
+        {% else %}<li class="empty" style="list-style:none">— idle —</li>{% endfor %}
+      </ul>
+    </div>
+
+    {% if b.blocked %}
+    <div class="team-sect blk">
+      <div class="lbl" style="color:var(--red)">Blocked</div>
+      <ul>{% for t in b.blocked %}<li>{{ t.title }}{% if t.notes %} <span class="dim" style="font-size:11px">— {{ t.notes }}</span>{% endif %}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    {% if b.completed_today %}
+    <div class="team-sect dn">
+      <div class="lbl" style="color:var(--teal-2)">Completed today</div>
+      <ul>{% for t in b.completed_today %}<li>{{ t.title }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

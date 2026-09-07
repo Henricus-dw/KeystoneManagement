@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar %}
+{% block title %}Edit Project{% endblock %}
+{% block kicker %}{{ project.code }} · {{ project.name }}{% endblock %}
+{% block heading %}Edit Project{% endblock %}
+
+{% block topbar_actions %}
+<a class="btn sm" href="/projects/{{ project.id }}">← Back</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="/projects/{{ project.id }}/edit" style="max-width:920px">
+  <div class="grid cols-2" style="gap:22px;align-items:start">
+
+    <div class="card pad">
+      <div class="card-h"><div class="kicker">Details</div></div>
+      <label class="field"><span>Project name</span>
+        <input name="name" required value="{{ project.name }}"></label>
+      <label class="field"><span>Client</span>
+        <input name="client" value="{{ project.client }}"></label>
+      <label class="field mb-0"><span>Description / brief</span>
+        <textarea name="description">{{ project.description }}</textarea></label>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:22px">
+      <div class="card pad">
+        <div class="card-h"><div class="kicker">Status &amp; timing</div></div>
+        <div class="grid cols-2" style="gap:12px 16px">
+          <label class="field mb-0"><span>Status</span>
+            <select name="status">{% for s in statuses %}<option value="{{ s.value }}" {{ 'selected' if s == project.status }}>{{ s.value }}</option>{% endfor %}</select></label>
+          <label class="field mb-0"><span>Priority</span>
+            <select name="priority">{% for p in priorities %}<option value="{{ p.value }}" {{ 'selected' if p == project.priority }}>{{ p.value }}</option>{% endfor %}</select></label>
+          <label class="field mb-0"><span>Health <span class="dim" style="text-transform:none;letter-spacing:0">(manual override)</span></span>
+            <select name="health">{% for h in healths %}<option value="{{ h.value }}" {{ 'selected' if h == project.health }}>{{ h.value }}</option>{% endfor %}</select></label>
+          <label class="field mb-0"><span>Progress</span>
+            <input value="{{ project.progress }}% (auto from tasks)" disabled></label>
+          <label class="field mb-0"><span>Start date</span><input type="date" name="start_date" value="{{ project.start_date.isoformat() if project.start_date }}"></label>
+          <label class="field mb-0"><span>Due date</span><input type="date" name="due_date" value="{{ project.due_date.isoformat() if project.due_date }}"></label>
+        </div>
+      </div>
+
+      <div class="card pad">
+        <div class="card-h"><div class="kicker">Assign developers</div></div>
+        <div class="wrap" style="gap:10px">
+          {% set assigned = project.members|map(attribute='id')|list %}
+          {% for m in members %}
+          <label class="pick">
+            <input type="checkbox" name="members" value="{{ m.id }}" {{ 'checked' if m.id in assigned }}>
+            <span class="pick-chip">{{ avatar(m, 'sm') }} {{ m.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row" style="gap:12px;margin-top:22px">
+    <button class="btn primary" type="submit">Save changes</button>
+    <a class="btn" href="/projects/{{ project.id }}">Cancel</a>
+  </div>
+</form>
+
+<style>
+  .pick { display:inline-flex; cursor:pointer; }
+  .pick input { display:none; }
+  .pick-chip { display:inline-flex; align-items:center; gap:8px; padding:6px 12px 6px 6px;
+    border:1px solid var(--line); border-radius:999px; font-size:13px; color:var(--muted); transition:.15s; }
+  .pick:hover .pick-chip { border-color:rgba(28,196,216,.4); color:var(--text); }
+  .pick input:checked + .pick-chip { border-color:var(--teal); color:var(--text);
+    background:rgba(28,196,216,.10); box-shadow:0 0 0 1px rgba(28,196,216,.3) inset; }
+</style>
+{% endblock %}

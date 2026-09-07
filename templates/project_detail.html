@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import badge, stack, avatar %}
+{% block title %}{{ project.name }}{% endblock %}
+{% block kicker %}{{ project.code }} · {{ project.client }}{% endblock %}
+{% block heading %}{{ project.name }}{% endblock %}
+
+{% block topbar_actions %}
+  {{ badge(project.status) }}
+  {{ badge(project.health, outline=true) }}
+  {% if can_edit %}<a class="btn sm" href="/projects/{{ project.id }}/edit">Edit</a>{% endif %}
+  {% set can_board = user.role.value in ['Admin', 'Manager'] or user in project.members %}
+  {% if can_board %}<a class="btn sm" href="/board?project_id={{ project.id }}">Open board →</a>{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="grid cols-4" style="margin-bottom:22px">
+  <div class="card pad stat accent">
+    <div class="kicker">Progress</div>
+    <div class="num">{{ project.progress }}<small>%</small></div>
+    <div class="bar" style="margin-top:12px"><i style="width:{{ project.progress }}%"></i></div>
+  </div>
+  <div class="card pad stat">
+    <div class="kicker">Priority</div>
+    <div style="margin-top:6px">{{ badge(project.priority) }}</div>
+    <div class="sub" style="margin-top:14px">
+      {% if project.status == ProjectStatus.maintenance %}Ongoing · no fixed deadline
+      {% else %}Deadline {{ project.due_date|shortdate }}{% if project.days_left is not none %} · {% if project.days_left < 0 %}{{ -project.days_left }}d overdue{% else %}{{ project.days_left }}d left{% endif %}{% endif %}{% endif %}
+    </div>
+  </div>
+  <div class="card pad stat">
+    <div class="kicker">Tasks</div>
+    <div class="num">{{ project.tasks|length }}</div>
+    <div class="sub">{{ project.count(TaskStatus.done) }} done · {{ project.count(TaskStatus.blocked) }} blocked</div>
+  </div>
+  <div class="card pad">
+    <div class="kicker" style="margin-bottom:10px">Team</div>
+    {{ stack(project.members, 6) }}
+    <div class="dim" style="font-size:12px;margin-top:10px">{{ project.members|map(attribute='name')|join(', ') }}</div>
+    {% if project.creator %}<div class="dim" style="font-size:11px;margin-top:8px">Created by {{ project.creator.name }}</div>{% endif %}
+  </div>
+</div>
+
+{% if project.description %}
+<div class="card pad" style="margin-bottom:22px">
+  <div class="kicker" style="margin-bottom:8px">Brief</div>
+  <p class="muted mb-0" style="font-size:14px">{{ project.description }}</p>
+</div>
+{% endif %}
+
+<div class="section-title"><h2>Board</h2><div class="line"></div>
+  <span class="dim mono" style="font-size:11px">live snapshot</span></div>
+<div class="board">
+  {% for status in TASK_COLUMNS %}
+  <div class="col">
+    <div class="col-h k-{{ status|slug }}">
+      <span class="dot"></span><span class="t">{{ status.value }}</span>
+      <span class="count">{{ columns[status]|length }}</span>
+    </div>
+    <div class="col-body">
+      {% for t in columns[status] %}
+      <a class="kcard" href="/tasks/{{ t.id }}">
+        <div class="between"><span class="code">{{ t.code }}</span>
+          {% if t.priority.value in ['High','Critical'] %}{{ badge(t.priority) }}{% endif %}</div>
+        <div class="ktitle">{{ t.title }}</div>
+        <div class="kfoot">
+          {{ stack(t.assignees, 3) }}
+          {% if t.due_date %}<span class="dim mono" style="font-size:10.5px">{{ t.due_date|shortdate }}</span>{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid cols-2" style="margin-top:26px">
+  <div>
+    <div class="section-title"><h2>Latest reports</h2><div class="line"></div></div>
+    {% for r in reports %}
+    <div class="card standup" style="margin-bottom:12px">
+      <div class="person">{{ avatar(r.user) }}<div><b>{{ r.user.name.split()[0] }}</b><small>{{ r.report_date.strftime('%d %b') }}</small></div></div>
+      <div class="sections">
+        <div class="sec today"><div class="lbl">Today</div><p>{{ r.today or '—' }}</p></div>
+        <div class="sec tomorrow"><div class="lbl">Tomorrow</div><p>{{ r.tomorrow or '—' }}</p></div>
+        <div class="sec blocked"><div class="lbl">Blocked</div>{% if r.blocked %}<p>{{ r.blocked }}</p>{% else %}<p class="none">Nothing</p>{% endif %}</div>
+      </div>
+    </div>
+    {% else %}<div class="empty-state">No progress reports yet.</div>{% endfor %}
+  </div>
+  <div>
+    <div class="section-title"><h2>Activity</h2><div class="line"></div></div>
+    <div class="card pad">
+      <div class="feed">
+        {% for a in activities %}
+        <div class="feed-item">
+          <div class="time">{{ a.created_at|clocktime }}</div>
+          <div><div class="what">{% if a.user %}<b>{{ a.user.name.split()[0] }}</b>{% endif %}<span class="verb {{ a.verb }}">{{ a.summary }}</span></div>
+            <div class="dim" style="font-size:11.5px">{{ a.created_at|timeago }}</div></div>
+        </div>
+        {% else %}<div class="dim">No activity yet.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if can_delete %}
+<div class="section-title" style="margin-top:34px"><h2 style="color:var(--red)">Danger zone</h2><div class="line"></div></div>
+<div class="card pad danger">
+  <div class="between" style="gap:18px;flex-wrap:wrap">
+    <div>
+      <b style="font-family:var(--head)">Delete this project</b>
+      <div class="dim" style="font-size:12.5px;margin-top:3px">
+        Permanently removes the project and its {{ project.tasks|length }} task{{ '' if project.tasks|length == 1 else 's' }}, comments and attachments. This can't be undone.
+      </div>
+    </div>
+    <details class="del">
+      <summary class="btn sm danger-btn">Delete project…</summary>
+      <form method="post" action="/projects/{{ project.id }}/delete" class="del-form" id="delForm">
+        <label class="field mb-0">
+          <span>Type the project name exactly to confirm</span>
+          <div class="confirm-name mono">{{ project.name }}</div>
+          <input name="confirm" id="delConfirm" autocomplete="off" placeholder="Type the name here"
+                 data-name="{{ project.name }}">
+        </label>
+        {% if delete_error == 'mismatch' %}<div class="dim" style="color:var(--red);font-size:12px;margin-top:6px">The name didn't match. Nothing was deleted.</div>{% endif %}
+        <button class="btn sm danger-btn" type="submit" id="delBtn" disabled style="margin-top:12px;width:100%">Permanently delete</button>
+      </form>
+    </details>
+  </div>
+</div>
+
+<style>
+  .card.danger { border-color: rgba(244,103,122,.32); }
+  .danger-btn { color: var(--red); border-color: rgba(244,103,122,.4); background: rgba(244,103,122,.06); }
+  .danger-btn:hover { border-color: var(--red); }
+  .del summary { list-style: none; cursor: pointer; display: inline-flex; }
+  .del summary::-webkit-details-marker { display: none; }
+  .del[open] summary { display: none; }
+  .del-form { margin-top: 4px; min-width: 280px; }
+  .confirm-name { text-transform: none; letter-spacing: .02em; font-size: 13.5px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 11px; margin-bottom: 9px; user-select: all; }
+  #delBtn:disabled { opacity: .45; cursor: not-allowed; }
+  #delBtn:not(:disabled) { background: var(--red); color: #1a0a0d; border-color: var(--red); }
+</style>
+<script>
+  (function () {
+    var input = document.getElementById("delConfirm");
+    var btn = document.getElementById("delBtn");
+    if (!input) return;
+    input.addEventListener("input", function () {
+      btn.disabled = input.value.trim() !== input.dataset.name;
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import badge, stack, avatar %}
+{% block title %}Dashboard{% endblock %}
+{% block kicker %}Overview · {{ today().strftime('%A %d %B %Y') }}{% endblock %}
+{% block heading %}Mission Control{% endblock %}
+
+{% block head %}
+<style>
+  .hero { display: grid; grid-template-columns: 1.1fr 2fr; gap: 18px; margin-bottom: 22px; }
+  .hero .ringcard { display: flex; align-items: center; gap: 22px; }
+  .hero .ringcard .legend { display:flex; flex-direction:column; gap:10px; }
+  .hero .ringcard .legend div { font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+  .hero .ringcard .legend b { color:var(--text); font-family:var(--mono); }
+  @media (max-width: 1100px){ .hero { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="hero">
+  <div class="card pad stat accent">
+    <div class="kicker">Overall completion</div>
+    <div class="ringcard">
+      <div class="ring" style="--p: {{ overall }}; --c: var(--teal)">
+        <b class="ring-val">{{ overall }}<span class="pct">%</span></b>
+        <span class="ring-label">ACTIVE</span>
+      </div>
+      <div class="legend">
+        <div><b style="color:var(--teal)">{{ stats.active }}</b> projects in flight</div>
+        <div><b style="color:var(--teal-2)">{{ stats.done_tasks }}</b> of {{ stats.total_tasks }} tasks done</div>
+        <div><b style="color:var(--red)">{{ stats.blocked_tasks }}</b> tasks blocked</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid cols-3" style="align-content:start">
+    <div class="card pad stat">
+      <div class="kicker">In development</div>
+      <div class="num">{{ active|selectattr('status.value','equalto','Development')|list|length }}</div>
+      <div class="sub">projects actively being built</div>
+    </div>
+    <div class="card pad stat warn">
+      <div class="kicker">At risk</div>
+      <div class="num">{{ stats.at_risk }}</div>
+      <div class="sub">need attention this week</div>
+    </div>
+    <div class="card pad stat">
+      <div class="kicker">Waiting on client</div>
+      <div class="num">{{ waiting|length }}</div>
+      <div class="sub">blocked on external input</div>
+    </div>
+    <div class="card pad stat">
+      <div class="kicker">Total projects</div>
+      <div class="num">{{ stats.total_projects }}</div>
+      <div class="sub">across the portfolio</div>
+    </div>
+    <div class="card pad stat">
+      <div class="kicker">Recently completed</div>
+      <div class="num">{{ recent_done|length }}</div>
+      <div class="sub">tasks shipped lately</div>
+    </div>
+    <div class="card pad stat accent">
+      <div class="kicker">Team members</div>
+      <div class="num">{{ stats.team }}</div>
+      <div class="sub">developers & managers</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid cols-2" style="gap:24px">
+  <!-- Active projects -->
+  <div>
+    <div class="section-title"><h2>Projects in flight</h2><div class="line"></div>
+      <a class="dim mono" href="/projects" style="font-size:11px;letter-spacing:.1em">ALL →</a></div>
+    {% for p in active %}
+    <a class="card pcard" href="/projects/{{ p.id }}">
+      <div class="top">
+        <div>
+          <span class="code">{{ p.code }}</span>
+          <b>{{ p.name }}</b>
+          <span class="client">{{ p.client }}</span>
+        </div>
+        {{ badge(p.health, outline=true) }}
+      </div>
+      <div class="bar {{ 'warn' if p.health.value in ['At Risk','Delayed'] }}{{ 'bad' if p.health.value == 'Blocked' }}">
+        <i style="width: {{ p.progress }}%"></i>
+      </div>
+      <div class="foot">
+        <div class="row">{{ stack(p.members) }}</div>
+        <div class="row" style="gap:14px">
+          {{ badge(p.status) }}
+          <span class="mono dim" style="font-size:12px">{{ p.progress }}%</span>
+        </div>
+      </div>
+    </a>
+    {% else %}
+    <div class="empty-state">No active projects.</div>
+    {% endfor %}
+  </div>
+
+  <!-- Activity + at risk + recent -->
+  <div>
+    {% if at_risk %}
+    <div class="section-title"><h2>Needs attention</h2><div class="line"></div></div>
+    <div class="card pad" style="margin-bottom:18px">
+      {% for p in at_risk %}
+      <div class="between" style="padding:9px 0;{{ 'border-top:1px solid var(--line-soft)' if not loop.first }}">
+        <div class="row">
+          <span class="flag">⚠</span>
+          <div><a href="/projects/{{ p.id }}"><b style="font-family:var(--head)">{{ p.name }}</b></a>
+            <div class="dim" style="font-size:12px">{{ p.client }}{% if p.status == ProjectStatus.maintenance %} · ongoing{% elif p.days_left is not none %} · {% if p.days_left < 0 %}{{ -p.days_left }}d overdue{% else %}{{ p.days_left }}d left{% endif %}{% endif %}</div></div>
+        </div>
+        {{ badge(p.health, outline=true) }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="section-title"><h2>Recently completed</h2><div class="line"></div></div>
+    <div class="card pad">
+      {% for t in recent_done %}
+      <div class="between" style="padding:8px 0;{{ 'border-top:1px solid var(--line-soft)' if not loop.first }}">
+        <div class="row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal-2)" stroke-width="2"><path d="M5 12l4 4L19 7"/></svg>
+          <span style="font-size:13.5px">{{ t.title }}</span>
+        </div>
+        <span class="dim mono" style="font-size:11px">{{ t.project.name }}</span>
+      </div>
+      {% else %}<div class="dim">Nothing completed yet.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if welcome %}
+<!-- No-JS fallback path lands here; the entrance already played for JS users. -->
+{% endif %}
+{% endblock %}

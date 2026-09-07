@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar %}
+{% block title %}Activity Log{% endblock %}
+{% block kicker %}Audit trail{% endblock %}
+{% block heading %}Activity Log{% endblock %}
+
+{% block topbar_actions %}
+<span class="dim mono" style="font-size:12px">{{ total }} event{{ '' if total == 1 else 's' }}</span>
+<a class="btn primary sm" href="/activity/export.pdf?developer={{ f.developer }}&project={{ f.project }}&verb={{ f.verb }}&date_from={{ f.date_from }}&date_to={{ f.date_to }}">
+  ⤓ Export PDF
+</a>
+{% endblock %}
+
+{% block content %}
+{% set vcolor = {
+  'deleted':'var(--red)', 'blocked':'var(--red)',
+  'completed':'var(--teal-2)', 'created':'var(--teal-2)',
+  'moved':'var(--teal)', 'updated':'var(--teal)',
+  'commented':'var(--muted)', 'reported':'var(--muted)',
+  'signed in':'var(--blue)', 'signed out':'var(--dim)'
+} %}
+
+<!-- Filters (auto-apply on change) -->
+<form method="get" action="/activity" class="card pad" style="margin-bottom:18px" onchange="this.submit()">
+  <div class="grid" style="grid-template-columns:repeat(5,1fr) auto;gap:12px;align-items:end">
+    <label class="field mb-0"><span>Developer</span>
+      <select name="developer">
+        <option value="">Everyone</option>
+        {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if f.developer == u.id|string }}>{{ u.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field mb-0"><span>Project</span>
+      <select name="project">
+        <option value="">All projects</option>
+        {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if f.project == p.id|string }}>{{ p.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field mb-0"><span>Type</span>
+      <select name="verb">
+        <option value="">All types</option>
+        {% for v in verbs %}<option value="{{ v }}" {{ 'selected' if f.verb == v }}>{{ v|capitalize }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field mb-0"><span>From</span><input type="date" name="date_from" value="{{ f.date_from }}"></label>
+    <label class="field mb-0"><span>To</span><input type="date" name="date_to" value="{{ f.date_to }}"></label>
+    <label class="field mb-0">
+      <span style="visibility:hidden">Clear</span>
+      <a class="btn sm" href="/activity" style="height:42px">Clear</a>
+      <noscript><button class="btn primary sm" type="submit" style="height:42px;margin-top:8px">Apply</button></noscript>
+    </label>
+  </div>
+</form>
+
+<div class="card pad">
+  <table class="kt">
+    <thead><tr><th style="width:40px"></th><th>Who</th><th>Event</th><th>Project</th><th style="text-align:right">When</th></tr></thead>
+    <tbody>
+      {% for a in items %}
+      <tr>
+        <td><span class="vdot" style="background: {{ vcolor.get(a.verb, 'var(--muted)') }}"></span></td>
+        <td>
+          {% if a.user %}<div class="row" style="gap:9px">{{ avatar(a.user, 'sm') }}<span style="font-size:13px">{{ a.user.name }}</span></div>
+          {% else %}<span class="dim">System</span>{% endif %}
+        </td>
+        <td style="font-size:13.5px">{{ a.summary }}</td>
+        <td>{% if a.project %}<a href="/projects/{{ a.project.id }}" class="mono dim" style="font-size:12px">{{ a.project.name }}</a>{% else %}<span class="dim" style="font-size:12px">—</span>{% endif %}</td>
+        <td class="mono dim" style="font-size:11.5px;text-align:right;white-space:nowrap">{{ a.created_at|stamp }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5"><div class="dim" style="padding:10px 0">No activity matches these filters.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pages > 1 %}
+{% set qs = "&developer=" ~ f.developer ~ "&project=" ~ f.project ~ "&verb=" ~ f.verb ~ "&date_from=" ~ f.date_from ~ "&date_to=" ~ f.date_to %}
+<div class="row" style="justify-content:center;gap:10px;margin-top:22px">
+  {% if page > 1 %}<a class="btn sm" href="/activity?page={{ page - 1 }}{{ qs }}">← Newer</a>{% endif %}
+  <span class="dim mono" style="font-size:12px">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="btn sm" href="/activity?page={{ page + 1 }}{{ qs }}">Older →</a>{% endif %}
+</div>
+{% endif %}
+
+<style>
+  .vdot { display:inline-block; width:9px; height:9px; border-radius:50%; }
+</style>
+{% endblock %}

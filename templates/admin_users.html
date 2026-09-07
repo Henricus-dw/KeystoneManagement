@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, badge %}
+{% block title %}Team Members{% endblock %}
+{% block kicker %}Admin · Access control{% endblock %}
+{% block heading %}Team Members{% endblock %}
+
+{% block content %}
+{% if created %}<div class="notice">Team member added. They can sign in with the password you set.</div>{% endif %}
+{% if updated %}<div class="notice">Changes saved.</div>{% endif %}
+{% if error == 'exists' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">That email is already in use.</div>{% endif %}
+
+<div class="grid" style="grid-template-columns:1.6fr 1fr;gap:22px;align-items:start">
+  <div class="card pad">
+    <table class="kt">
+      <thead><tr><th>Member</th><th>Role</th><th>Email</th><th></th></tr></thead>
+      <tbody>
+        {% for m in members %}
+        <tr>
+          <td><div class="row" style="gap:10px">{{ avatar(m, 'sm') }}<div><b style="font-family:var(--head)">{{ m.name }}</b><div class="dim" style="font-size:11px">{{ m.title }}</div></div></div></td>
+          <td>{{ badge(m.role, outline=true) }}</td>
+          <td class="muted mono" style="font-size:12px">{{ m.email }}</td>
+          <td style="text-align:right"><button type="button" class="btn sm" data-edit="{{ m.id }}">Edit</button></td>
+        </tr>
+        <tr class="edit-row" id="edit-{{ m.id }}" hidden>
+          <td colspan="4" style="background:var(--bg-2)">
+            <form method="post" action="/admin/users/{{ m.id }}">
+              <div class="grid cols-2" style="gap:12px 16px">
+                <label class="field mb-0"><span>Full name</span><input name="name" required value="{{ m.name }}"></label>
+                <label class="field mb-0"><span>Email</span><input type="email" name="email" required value="{{ m.email }}"></label>
+                <label class="field mb-0"><span>Role</span>
+                  <select name="role">{% for r in roles %}<option value="{{ r.value }}" {{ 'selected' if r == m.role }}>{{ r.value }}</option>{% endfor %}</select>
+                </label>
+                <label class="field mb-0"><span>Title</span><input name="title" value="{{ m.title }}"></label>
+                <label class="field mb-0"><span>New password <span class="dim" style="text-transform:none;letter-spacing:0">— blank = unchanged</span></span><input name="password" placeholder="••••••••"></label>
+                <label class="field mb-0"><span>Accent</span><input type="color" name="accent" value="{{ m.accent }}" style="height:42px;padding:4px"></label>
+              </div>
+              <div class="row" style="gap:10px;margin-top:14px">
+                <button class="btn primary sm" type="submit">Save changes</button>
+                <button class="btn sm" type="button" data-cancel="{{ m.id }}">Cancel</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card pad">
+    <div class="card-h"><div class="kicker">Add team member</div></div>
+    <form method="post" action="/admin/users">
+      <label class="field"><span>Full name</span><input name="name" required placeholder="Jane Doe"></label>
+      <label class="field"><span>Email</span><input type="email" name="email" required placeholder="jane@professional.za.com"></label>
+      <label class="field"><span>Temporary password</span><input name="password" required value="keystone"></label>
+      <div class="grid cols-2" style="gap:12px">
+        <label class="field"><span>Role</span>
+          <select name="role">{% for r in roles %}<option value="{{ r.value }}" {{ 'selected' if r.value=='Developer' }}>{{ r.value }}</option>{% endfor %}</select>
+        </label>
+        <label class="field"><span>Accent</span><input type="color" name="accent" value="#1CC4D8" style="height:42px;padding:4px"></label>
+      </div>
+      <label class="field"><span>Title</span><input name="title" placeholder="Backend Developer"></label>
+      <button class="btn primary" type="submit" style="width:100%">Create member</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll("[data-edit]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const row = document.getElementById("edit-" + b.dataset.edit);
+      const open = !row.hidden;
+      document.querySelectorAll(".edit-row").forEach((r) => (r.hidden = true));
+      row.hidden = open;
+      if (!open) row.querySelector("input[name=name]").focus();
+    });
+  });
+  document.querySelectorAll("[data-cancel]").forEach((b) => {
+    b.addEventListener("click", () => { document.getElementById("edit-" + b.dataset.cancel).hidden = true; });
+  });
+</script>
+{% endblock %}

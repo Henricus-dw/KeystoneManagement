@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import badge, stack %}
+{% block title %}Projects{% endblock %}
+{% block kicker %}Portfolio{% endblock %}
+{% block heading %}Projects{% endblock %}
+
+{% block topbar_actions %}
+<a class="btn primary sm" href="/projects/new">+ New Project</a>
+{% endblock %}
+
+{% block content %}
+<div class="proj-row" style="background:transparent;border:0;box-shadow:none;padding-bottom:0;margin-bottom:4px">
+  <div class="kicker">Project</div>
+  <div class="kicker">Client</div>
+  <div class="kicker">Progress</div>
+  <div class="kicker">Status</div>
+  <div class="kicker" style="text-align:right">Health</div>
+</div>
+
+{% for p in projects %}
+<a class="proj-row" href="/projects/{{ p.id }}">
+  <div class="pname">
+    <b>{{ p.name }}</b>
+    <span class="code">{{ p.code }} · {{ p.priority.value }} priority</span>
+  </div>
+  <div>
+    <div class="muted">{{ p.client }}</div>
+    <div style="margin-top:6px">{{ stack(p.members) }}</div>
+  </div>
+  <div>
+    <div class="bar {{ 'warn' if p.health.value in ['At Risk','Delayed'] }}{{ 'bad' if p.health.value == 'Blocked' }}" style="margin-bottom:6px"><i style="width:{{ p.progress }}%"></i></div>
+    <span class="mono dim" style="font-size:11px">{{ p.progress }}% · {{ p.tasks|length }} tasks</span>
+  </div>
+  <div>{{ badge(p.status) }}</div>
+  <div style="text-align:right">{{ badge(p.health, outline=true) }}</div>
+</a>
+{% else %}
+<div class="empty-state">No projects yet.</div>
+{% endfor %}
+{% endblock %}

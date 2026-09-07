@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar %}
+{% block title %}Daily Reports{% endblock %}
+{% block kicker %}Stand-up · {{ today().strftime('%A %d %B') }}{% endblock %}
+{% block heading %}Daily Progress Reports{% endblock %}
+
+{% macro standup_card(r, show_person=true) %}
+<div class="card standup" style="margin-bottom:12px">
+  <div class="person">
+    {{ avatar(r.user) }}
+    <div>
+      <b>{% if show_person %}{{ r.user.name.split()[0] }}{% else %}{{ r.report_date.strftime('%a %d %b') }}{% endif %}</b>
+      <small>{{ r.report_date.strftime('%d %b %Y') }}{% if r.project %} · {{ r.project.name }}{% endif %}</small>
+    </div>
+  </div>
+  <div class="sections">
+    <div class="sec today"><div class="lbl">Today</div>{% if r.today %}<p>{{ r.today }}</p>{% else %}<p class="none">—</p>{% endif %}</div>
+    <div class="sec tomorrow"><div class="lbl">Tomorrow</div>{% if r.tomorrow %}<p>{{ r.tomorrow }}</p>{% else %}<p class="none">—</p>{% endif %}</div>
+    <div class="sec blocked"><div class="lbl">Blocked</div>{% if r.blocked %}<p>{{ r.blocked }}</p>{% else %}<p class="none">Nothing</p>{% endif %}</div>
+  </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+
+{% if is_dev %}
+<div class="grid cols-2" style="align-items:start;gap:22px">
+  <!-- Submit / edit my report (one per project per day) -->
+  <div class="card pad">
+    <div class="card-h"><div class="kicker">Today's report</div></div>
+    <form method="post" action="/progress">
+      <label class="field">
+        <span>Project</span>
+        <select name="project_id" id="repProject">
+          <option value="">— general —</option>
+          {% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="field">
+        <span style="color:var(--teal-2)">Today — what you finished</span>
+        <textarea name="today" id="repToday" placeholder="Fixed login bug&#10;Added API endpoint&#10;Finished authentication"></textarea>
+      </label>
+      <label class="field">
+        <span style="color:var(--teal)">Tomorrow — what's next</span>
+        <textarea name="tomorrow" id="repTomorrow" placeholder="Continue user permissions&#10;Start notifications"></textarea>
+      </label>
+      <label class="field">
+        <span style="color:var(--red)">Blocked — anything in your way</span>
+        <textarea name="blocked" id="repBlocked" placeholder="Waiting for client response" style="min-height:60px"></textarea>
+      </label>
+      <button class="btn primary" type="submit" id="repSubmit">Submit report</button>
+      <p class="dim" style="font-size:12px;margin:10px 0 0">You can file a separate report for each of your projects today.</p>
+    </form>
+  </div>
+
+  <!-- My history -->
+  <div>
+    <div class="section-title" style="margin-top:0"><h2>Your past reports</h2><div class="line"></div></div>
+    <form method="get" action="/progress" onchange="this.submit()" class="card pad" style="margin-bottom:14px">
+      <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:12px;align-items:end">
+        <label class="field mb-0"><span>From</span><input type="date" name="date_from" value="{{ f.date_from }}"></label>
+        <label class="field mb-0"><span>To</span><input type="date" name="date_to" value="{{ f.date_to }}"></label>
+        <label class="field mb-0"><span style="visibility:hidden">Clear</span><a class="btn sm" href="/progress" style="height:42px">Clear</a></label>
+      </div>
+    </form>
+    {% for r in reports %}{{ standup_card(r, show_person=false) }}{% else %}<div class="empty-state">No reports in this range yet.</div>{% endfor %}
+  </div>
+</div>
+
+{% else %}
+<!-- Oversight: filters across the whole team, no submit form -->
+<form method="get" action="/progress" onchange="this.submit()" class="card pad" style="margin-bottom:18px">
+  <div class="grid" style="grid-template-columns:repeat(3,1fr) auto;gap:12px;align-items:end">
+    <label class="field mb-0"><span>Developer</span>
+      <select name="developer">
+        <option value="">Everyone</option>
+        {% for d in developers %}<option value="{{ d.id }}" {{ 'selected' if f.developer == d.id|string }}>{{ d.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field mb-0"><span>From</span><input type="date" name="date_from" value="{{ f.date_from }}"></label>
+    <label class="field mb-0"><span>To</span><input type="date" name="date_to" value="{{ f.date_to }}"></label>
+    <label class="field mb-0"><span style="visibility:hidden">Clear</span><a class="btn sm" href="/progress" style="height:42px">Clear</a></label>
+  </div>
+</form>
+{% for r in reports %}{{ standup_card(r, show_person=true) }}{% else %}<div class="empty-state">No reports match these filters.</div>{% endfor %}
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if is_dev %}
+<script>
+  (function () {
+    var TR = {{ today_map|tojson }};
+    var proj = document.getElementById("repProject");
+    var t = document.getElementById("repToday");
+    var tm = document.getElementById("repTomorrow");
+    var bl = document.getElementById("repBlocked");
+    var btn = document.getElementById("repSubmit");
+    function load(key) {
+      var r = TR[key] || {};
+      t.value = r.today || "";
+      tm.value = r.tomorrow || "";
+      bl.value = r.blocked || "";
+      btn.textContent = (key in TR) ? "Update report" : "Submit report";
+    }
+    proj.addEventListener("change", function (e) { load(e.target.value); });
+    load(proj.value);
+  })();
+</script>
+{% endif %}
+{% endblock %}
