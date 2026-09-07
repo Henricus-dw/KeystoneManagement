@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.config import STATIC_DIR, UPLOADS_DIR
+from app.config import SERVER_IMAGES_DIR
 from app.db import get_db
 from app.deps import require_user
 from app.models import Server, ServerEnv, ServerKind, User
@@ -28,8 +28,8 @@ from app.templating import templates
 
 router = APIRouter()
 
-# Cover-image upload constraints.
-SERVERS_IMG_DIR = UPLOADS_DIR / "servers"
+# Cover-image upload constraints. Files live in SERVER_IMAGES_DIR (outside the
+# static tree); Server.image stores just the bare filename.
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 # content-type -> extension, and the leading magic bytes we expect.
 ALLOWED_IMAGES = {
@@ -40,13 +40,25 @@ ALLOWED_IMAGES = {
 }
 
 
+def _image_path(server: Server):
+    """Resolved on-disk path for a server's image, or None if it has none or
+    the stored name would escape the images directory."""
+    if not server.image:
+        return None
+    base = SERVER_IMAGES_DIR.resolve()
+    path = (base / server.image).resolve()
+    if path.parent != base:
+        return None  # defensive: reject any name that isn't a direct child
+    return path
+
+
 def _delete_image_file(server: Server) -> None:
     """Remove a server's stored image file from disk, if any."""
-    if not server.image:
+    path = _image_path(server)
+    if not path:
         return
-    path = (STATIC_DIR / server.image).resolve()
     try:
-        if path.is_file() and SERVERS_IMG_DIR.resolve() in path.parents:
+        if path.is_file():
             path.unlink()
     except OSError:
         pass
@@ -239,10 +251,10 @@ def toggle_share(server_id: int, user: User = Depends(require_user), db: Session
 def server_image(server_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
     """Serve a server's cover image behind the same access rules as the entry."""
     server = db.get(Server, server_id)
-    if not server or not server.can_view(user) or not server.image:
+    if not server or not server.can_view(user):
         return Response(status_code=404)
-    path = (STATIC_DIR / server.image).resolve()
-    if not (path.is_file() and SERVERS_IMG_DIR.resolve() in path.parents):
+    path = _image_path(server)
+    if not path or not path.is_file():
         return Response(status_code=404)
     return FileResponse(path, headers={"Cache-Control": "private, max-age=60"})
 
@@ -268,11 +280,11 @@ async def upload_image(server_id: int, image: UploadFile = File(...),
         # empty, or the bytes don't match the claimed image type
         return RedirectResponse(f"/servers/{server_id}?img_error=type", status_code=303)
 
-    SERVERS_IMG_DIR.mkdir(parents=True, exist_ok=True)
+    SERVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     _delete_image_file(server)  # drop any previous file
     fname = f"{server.id}-{secrets.token_hex(8)}.{ext}"
-    (SERVERS_IMG_DIR / fname).write_bytes(data)
-    server.image = f"uploads/servers/{fname}"
+    (SERVER_IMAGES_DIR / fname).write_bytes(data)
+    server.image = fname
     log_activity(db, user=user, verb="updated",
                  summary=f'updated the image for "{server.name}"')
     db.commit()

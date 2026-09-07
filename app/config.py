@@ -6,6 +6,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 UPLOADS_DIR = STATIC_DIR / "uploads"
+# Server cover images live OUTSIDE the (locked, read-only) static tree, in a
+# directory the service can actually write to. They are served through an
+# authenticated route, so they never need to sit under the public /static mount.
+DATA_DIR = BASE_DIR / "data"
+SERVER_IMAGES_DIR = DATA_DIR / "server_images"
 DB_PATH = BASE_DIR / "keystone.db"
 
 DATABASE_URL = f"sqlite:///{DB_PATH}"
@@ -19,3 +24,4 @@ APP_NAME = "Keystone"
 APP_TAGLINE = "Project execution, in focus."
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+SERVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
