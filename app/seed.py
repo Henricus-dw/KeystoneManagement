@@ -53,6 +53,15 @@ def _migrate() -> None:
                 """
             )
 
+        # servers.image -- added when server blocks gained a cover image.
+        tables = [r[0] for r in conn.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table'")]
+        if "servers" in tables:
+            scols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(servers)")]
+            if "image" not in scols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE servers ADD COLUMN image VARCHAR(300) NOT NULL DEFAULT ''")
+
 
 def seed() -> None:
     init_db()

@@ -441,3 +441,8 @@ table.kt tr:hover td { background: rgba(28,196,216,.03); }
 .sidebar .whatsnew svg { width: 16px; height: 16px; opacity: .85; }
 .sidebar .whatsnew .ver { margin-left: auto; font-family: var(--mono); font-size: 10.5px;
   letter-spacing: .06em; color: var(--dim); }
+
+/* Pin "What's new" to the bottom, just above the user block, so it reads as
+   separate from the nav. (Overrides the earlier margins.) */
+.sidebar .whatsnew { margin-top: auto; }
+.sidebar .me { margin-top: 12px; }

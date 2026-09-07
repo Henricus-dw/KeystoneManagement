@@ -22,6 +22,8 @@ CHANGELOG: list[dict] = [
                     "the team, and only its owner or an admin can edit or delete it."),
             ("New", "One-click copy on every connection detail, and a show/hide "
                     "toggle on stored passwords so they stay masked until you need them."),
+            ("New", "Servers now appear as blocks, each with an optional cover image "
+                    "you can upload from the server's page."),
             ("New", "Personal avatar colour: pick your own under Account settings."),
             ("New", "This 'What's new' page, reachable from the sidebar."),
         ],

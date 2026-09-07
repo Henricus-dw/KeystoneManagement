@@ -321,6 +321,7 @@ class Server(Base):
     secret: Mapped[str] = mapped_column(Text, default="")            # password / key (see note)
     url: Mapped[str] = mapped_column(String(400), default="")        # panel / management URL
     notes: Mapped[str] = mapped_column(Text, default="")
+    image: Mapped[str] = mapped_column(String(300), default="")   # path under static/, e.g. uploads/servers/3-ab12.png
     shared: Mapped[bool] = mapped_column(default=False)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

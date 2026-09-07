@@ -12,11 +12,14 @@ project) -- see the note on the Server model.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse
+import secrets
+
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.config import STATIC_DIR, UPLOADS_DIR
 from app.db import get_db
 from app.deps import require_user
 from app.models import Server, ServerEnv, ServerKind, User
@@ -24,6 +27,29 @@ from app.services import log_activity
 from app.templating import templates
 
 router = APIRouter()
+
+# Cover-image upload constraints.
+SERVERS_IMG_DIR = UPLOADS_DIR / "servers"
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+# content-type -> extension, and the leading magic bytes we expect.
+ALLOWED_IMAGES = {
+    "image/png": ("png", b"\x89PNG\r\n\x1a\n"),
+    "image/jpeg": ("jpg", b"\xff\xd8\xff"),
+    "image/webp": ("webp", b"RIFF"),
+    "image/gif": ("gif", b"GIF8"),
+}
+
+
+def _delete_image_file(server: Server) -> None:
+    """Remove a server's stored image file from disk, if any."""
+    if not server.image:
+        return
+    path = (STATIC_DIR / server.image).resolve()
+    try:
+        if path.is_file() and SERVERS_IMG_DIR.resolve() in path.parents:
+            path.unlink()
+    except OSError:
+        pass
 
 
 def _enum_from(enum_cls, value: str, default):
@@ -207,6 +233,66 @@ def toggle_share(server_id: int, user: User = Depends(require_user), db: Session
 
 
 # ---------------------------------------------------------------------------
+# Cover image
+# ---------------------------------------------------------------------------
+@router.get("/servers/{server_id}/image")
+def server_image(server_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    """Serve a server's cover image behind the same access rules as the entry."""
+    server = db.get(Server, server_id)
+    if not server or not server.can_view(user) or not server.image:
+        return Response(status_code=404)
+    path = (STATIC_DIR / server.image).resolve()
+    if not (path.is_file() and SERVERS_IMG_DIR.resolve() in path.parents):
+        return Response(status_code=404)
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=60"})
+
+
+@router.post("/servers/{server_id}/image")
+async def upload_image(server_id: int, image: UploadFile = File(...),
+                       user: User = Depends(require_user), db: Session = Depends(get_db)):
+    server = db.get(Server, server_id)
+    if not server:
+        return RedirectResponse("/servers", status_code=303)
+    if not server.can_manage(user):
+        return RedirectResponse(f"/servers/{server_id}?error=forbidden", status_code=303)
+
+    spec = ALLOWED_IMAGES.get(image.content_type)
+    if not spec:
+        return RedirectResponse(f"/servers/{server_id}?img_error=type", status_code=303)
+    ext, magic = spec
+
+    data = await image.read(MAX_IMAGE_BYTES + 1)
+    if len(data) > MAX_IMAGE_BYTES:
+        return RedirectResponse(f"/servers/{server_id}?img_error=size", status_code=303)
+    if not data or not data.startswith(magic):
+        # empty, or the bytes don't match the claimed image type
+        return RedirectResponse(f"/servers/{server_id}?img_error=type", status_code=303)
+
+    SERVERS_IMG_DIR.mkdir(parents=True, exist_ok=True)
+    _delete_image_file(server)  # drop any previous file
+    fname = f"{server.id}-{secrets.token_hex(8)}.{ext}"
+    (SERVERS_IMG_DIR / fname).write_bytes(data)
+    server.image = f"uploads/servers/{fname}"
+    log_activity(db, user=user, verb="updated",
+                 summary=f'updated the image for "{server.name}"')
+    db.commit()
+    return RedirectResponse(f"/servers/{server_id}", status_code=303)
+
+
+@router.post("/servers/{server_id}/image/delete")
+def delete_image(server_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    server = db.get(Server, server_id)
+    if not server:
+        return RedirectResponse("/servers", status_code=303)
+    if not server.can_manage(user):
+        return RedirectResponse(f"/servers/{server_id}?error=forbidden", status_code=303)
+    _delete_image_file(server)
+    server.image = ""
+    db.commit()
+    return RedirectResponse(f"/servers/{server_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Delete
 # ---------------------------------------------------------------------------
 @router.post("/servers/{server_id}/delete")
@@ -217,6 +303,7 @@ def delete_server(server_id: int, user: User = Depends(require_user), db: Sessio
     if not server.can_manage(user):
         return RedirectResponse(f"/servers/{server_id}?error=forbidden", status_code=303)
     name = server.name
+    _delete_image_file(server)  # tidy the uploaded file too
     db.delete(server)
     log_activity(db, user=user, verb="deleted", summary=f'deleted server "{name}"')
     db.commit()
