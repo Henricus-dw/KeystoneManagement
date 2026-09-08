@@ -17,5 +17,5 @@ jobs:
           key: ${{ secrets.KEYSTONE_SSH_KEY }}
           script: |
             cd /var/www/keystone
-            git pull origin main
-            sudo systemctl restart keystone.service
+            GIT_SSH_COMMAND='ssh -i /home/henridewitt/.ssh/keystone_deploy_key -o IdentitiesOnly=yes' git pull origin main
+            sudo -n systemctl restart keystone.service
