@@ -115,6 +115,7 @@ def projects_list(
         "user": user, "nav": "projects", "projects": projects,
         "development_projects": [p for p in projects if p.status != ProjectStatus.maintenance],
         "maintenance_projects": [p for p in projects if p.status == ProjectStatus.maintenance],
+        "filters_active": bool(selected_status or selected_health),
     })
 
 

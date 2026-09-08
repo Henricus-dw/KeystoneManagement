@@ -37,11 +37,13 @@
 </div>
 
 {% for category, category_projects in [('Development', development_projects), ('Maintenance', maintenance_projects)] %}
+{% if category_projects or not filters_active %}
 <div class="section-title" style="margin-top:{{ '0' if loop.first else '30px' }}px">
   <h2>{{ category }}</h2><div class="line"></div>
 </div>
 {% for p in category_projects %}{{ project_row(p) }}{% else %}
 <div class="empty-state">No {{ category|lower }} projects.</div>
 {% endfor %}
+{% endif %}
 {% endfor %}
 {% endblock %}
