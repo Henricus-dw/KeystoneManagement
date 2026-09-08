@@ -29,10 +29,10 @@ Then open **http://127.0.0.1:8000**.
 The database (`keystone.db`) is created and seeded with demo data on first run.
 Delete that file to start fresh.
 
-### Task assignment emails
+### Assignment emails
 
-Task assignment emails are sent through the configured SMTP server. Set these
-environment variables on the host before starting Keystone:
+Task and project assignment emails are sent through the configured SMTP server.
+Set these environment variables on the host before starting Keystone:
 
 ```bash
 export KEYSTONE_SMTP_HOST="smtp.example.com"

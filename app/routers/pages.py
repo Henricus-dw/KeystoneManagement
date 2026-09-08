@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
@@ -25,6 +25,7 @@ from app.models import (
     User,
     UserRole,
 )
+from app.notifications import send_project_assignment_email
 from app.security import hash_password, verify_password
 from app.services import log_activity, recompute_health
 from app.templating import templates
@@ -132,6 +133,7 @@ def new_project_form(request: Request, user: User = Depends(require_user), db: S
 
 @router.post("/projects")
 def create_project(
+    background_tasks: BackgroundTasks,
     name: str = Form(...),
     client: str = Form(""),
     description: str = Form(""),
@@ -173,6 +175,15 @@ def create_project(
     log_activity(db, user=user, verb="created",
                  summary=f'created project "{project.name}"', project=project)
     db.commit()
+    for member in chosen:
+        background_tasks.add_task(
+            send_project_assignment_email,
+            recipient=member.email,
+            recipient_name=member.name,
+            project_id=project.id,
+            project_name=project.name,
+            assigned_by=user.name,
+        )
     return RedirectResponse(f"/projects/{project.id}", status_code=303)
 
 
@@ -209,6 +220,7 @@ def edit_project_form(project_id: int, request: Request,
 @router.post("/projects/{project_id}/edit")
 def update_project(
     project_id: int,
+    background_tasks: BackgroundTasks,
     name: str = Form(...),
     client: str = Form(""),
     description: str = Form(""),
@@ -229,6 +241,7 @@ def update_project(
     if not name.strip():
         return RedirectResponse(f"/projects/{project_id}/edit", status_code=303)
 
+    previous_member_ids = {member.id for member in project.members}
     project.name = name.strip()
     project.client = client.strip()
     project.description = description.strip()
@@ -238,10 +251,21 @@ def update_project(
         project.health = next((h for h in ProjectHealth if h.value == health), project.health)
     project.start_date = _parse_date(start_date)
     project.due_date = _parse_date(due_date)
-    project.members = list(db.scalars(select(User).where(User.id.in_(members)))) if members else []
+    chosen = list(db.scalars(select(User).where(User.id.in_(members)))) if members else []
+    project.members = chosen
     log_activity(db, user=user, verb="updated",
                  summary=f'updated project "{project.name}"', project=project)
     db.commit()
+    for member in chosen:
+        if member.id not in previous_member_ids:
+            background_tasks.add_task(
+                send_project_assignment_email,
+                recipient=member.email,
+                recipient_name=member.name,
+                project_id=project.id,
+                project_name=project.name,
+                assigned_by=user.name,
+            )
     return RedirectResponse(f"/projects/{project_id}", status_code=303)
 
 
