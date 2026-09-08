@@ -239,6 +239,15 @@ h4 {
   opacity: .85;
 }
 
+.nav-test {
+  margin-left: auto;
+  color: #ff4d5f;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
 .nav a:hover {
   color: var(--text);
   background: var(--surface);
