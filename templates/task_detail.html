@@ -4,8 +4,20 @@
 {% block kicker %}{{ task.code }} · {{ task.project.name }}{% endblock %}
 {% block heading %}{{ task.title }}{% endblock %}
 
+{% block head %}
+<style>
+  .task-status-control { display:inline-flex; align-items:center; gap:8px; margin:0; }
+  .task-status-control span { color:var(--dim); font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; }
+  .task-status-control select { width:auto; min-width:128px; padding-top:7px; padding-bottom:7px; }
+</style>
+{% endblock %}
+
 {% block topbar_actions %}
-  {{ badge(task.status) }}
+  <label class="task-status-control"><span>Status</span>
+    <select id="taskStatus" aria-label="Task status">
+      {% for status in TASK_COLUMNS %}<option value="{{ status.value }}" {{ 'selected' if status == task.status }}>{{ status.value }}</option>{% endfor %}
+    </select>
+  </label>
   <a class="btn sm" href="/board?project_id={{ task.project_id }}">← Board</a>
 {% endblock %}
 
@@ -80,4 +92,37 @@
     {% endif %}
   </div>
 </div>
+<div id="taskStatusError" class="notice" style="display:none;border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red);margin-top:14px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var select = document.getElementById("taskStatus");
+    var error = document.getElementById("taskStatusError");
+    if (!select) return;
+    var previous = select.value;
+
+    select.addEventListener("change", async function () {
+      var next = select.value;
+      select.disabled = true;
+      error.style.display = "none";
+      try {
+        var response = await fetch("/api/tasks/{{ task.id }}/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: next })
+        });
+        var data = await response.json();
+        if (!data.ok) throw new Error(data.error || "Status could not be changed.");
+        window.location.reload();
+      } catch (err) {
+        select.value = previous;
+        select.disabled = false;
+        error.textContent = err.message;
+        error.style.display = "block";
+      }
+    });
+  })();
+</script>
 {% endblock %}
