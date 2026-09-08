@@ -47,6 +47,32 @@
 </div>
 {% endif %}
 
+<div class="section-title"><h2>Board</h2><div class="line"></div>
+  <span class="dim mono" style="font-size:11px">live snapshot</span></div>
+<div class="board">
+  {% for status in TASK_COLUMNS %}
+  <div class="col">
+    <div class="col-h k-{{ status|slug }}">
+      <span class="dot"></span><span class="t">{{ status.value }}</span>
+      <span class="count">{{ columns[status]|length }}</span>
+    </div>
+    <div class="col-body">
+      {% for t in columns[status] %}
+      <a class="kcard" href="/tasks/{{ t.id }}">
+        <div class="between"><span class="code">{{ t.code }}</span>
+          {% if t.priority.value in ['High','Critical'] %}{{ badge(t.priority) }}{% endif %}</div>
+        <div class="ktitle">{{ t.title }}</div>
+        <div class="kfoot">
+          {{ stack(t.assignees, 3) }}
+          {% if t.due_date %}<span class="dim mono" style="font-size:10.5px">{{ t.due_date|shortdate }}</span>{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
 <div class="section-title"><h2>Project files</h2><div class="line"></div></div>
 {% if uploaded %}<div class="notice">File uploaded.</div>{% endif %}
 {% if upload_error == 'forbidden' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">You don't have permission to upload files to this project.</div>{% endif %}
@@ -74,32 +100,6 @@
     <div class="dim">No project files uploaded yet.</div>
     {% endfor %}
   </div>
-</div>
-
-<div class="section-title"><h2>Board</h2><div class="line"></div>
-  <span class="dim mono" style="font-size:11px">live snapshot</span></div>
-<div class="board">
-  {% for status in TASK_COLUMNS %}
-  <div class="col">
-    <div class="col-h k-{{ status|slug }}">
-      <span class="dot"></span><span class="t">{{ status.value }}</span>
-      <span class="count">{{ columns[status]|length }}</span>
-    </div>
-    <div class="col-body">
-      {% for t in columns[status] %}
-      <a class="kcard" href="/tasks/{{ t.id }}">
-        <div class="between"><span class="code">{{ t.code }}</span>
-          {% if t.priority.value in ['High','Critical'] %}{{ badge(t.priority) }}{% endif %}</div>
-        <div class="ktitle">{{ t.title }}</div>
-        <div class="kfoot">
-          {{ stack(t.assignees, 3) }}
-          {% if t.due_date %}<span class="dim mono" style="font-size:10.5px">{{ t.due_date|shortdate }}</span>{% endif %}
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-  </div>
-  {% endfor %}
 </div>
 
 <div class="grid cols-2" style="margin-top:26px">
