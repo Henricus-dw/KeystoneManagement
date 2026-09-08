@@ -56,27 +56,27 @@
 
 /* ---- Tokens --------------------------------------------------- */
 :root {
-  --bg: #7a0d0d;
-  --bg-2: #8f1212;
-  --surface: #a31616;
-  --surface-2: #b91b1b;
-  --line: #d13b3b;
-  --line-soft: #bc2d2d;
+  --bg: #0d3b2d;
+  --bg-2: #124b38;
+  --surface: #155c46;
+  --surface-2: #1d735d;
+  --line: #2ea67d;
+  --line-soft: #227a64;
 
-  --text: #fff0f0;
-  --muted: #f4b4b4;
-  --dim: #f0a0a0;
+  --text: #eefff8;
+  --muted: #b5f3da;
+  --dim: #8fe3c4;
 
-  --teal: #ffd1d1;
-  --teal-2: #ffb3b3;
-  --teal-deep: #ff8f8f;
-  --gold: #ffd0d0;
-  --gold-soft: #ffc2c2;
-  --red: #ff3d3d;
-  --violet: #ffc5c5;
-  --orange: #ff7b7b;
-  --blue: #ffd9d9;
-  --pink: #ff9d9d;
+  --teal: #b9ffea;
+  --teal-2: #7af5c7;
+  --teal-deep: #48d3a4;
+  --gold: #d8ffe9;
+  --gold-soft: #c4f7dd;
+  --red: #ff6b6b;
+  --violet: #d0ffe7;
+  --orange: #7ae0b1;
+  --blue: #ccffee;
+  --pink: #aef7d4;
 
   --glow: 0 0 0 1px rgba(28, 196, 216, .0), 0 8px 30px -12px rgba(0, 0, 0, .7);
   --radius: 14px;
