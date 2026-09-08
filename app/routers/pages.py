@@ -422,6 +422,7 @@ def project_detail(project_id: int, request: Request,
         "uploaded": request.query_params.get("uploaded") == "1",
         "can_delete": user.role in (UserRole.admin, UserRole.manager),
         "can_edit": _can_edit_project(user, project),
+        "can_add": user.role in (UserRole.admin, UserRole.manager) or user in project.members,
         "can_upload": _can_upload_project(user, project),
     })
 

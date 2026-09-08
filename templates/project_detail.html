@@ -9,6 +9,7 @@
   {{ badge(project.health, outline=true) }}
   {% if can_edit %}<a class="btn sm" href="/projects/{{ project.id }}/edit">Edit</a>{% endif %}
   {% set can_board = user.role.value in ['Admin', 'Manager'] or user in project.members %}
+  {% if can_add %}<button class="btn primary sm" type="button" id="projectAddTask">+ Add task</button>{% endif %}
   {% if can_board %}<a class="btn sm" href="/board?project_id={{ project.id }}">Open board →</a>{% endif %}
 {% endblock %}
 
@@ -102,6 +103,46 @@
   </div>
 </div>
 
+{% if can_add %}
+{% set assignee_opts = project.members | selectattr('role', 'equalto', UserRole.developer) | list %}
+{% if user.role == UserRole.developer and user not in assignee_opts %}{% set assignee_opts = assignee_opts + [user] %}{% endif %}
+<div class="modal-overlay" id="projectTaskModal" data-project="{{ project.id }}" data-me="{{ user.id }}" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projectTaskTitle">
+    <div class="modal-h">
+      <div>
+        <div class="kicker">New task</div>
+        <h3 id="projectTaskTitle">Add to {{ project.name }}</h3>
+      </div>
+      <button type="button" class="modal-x" id="projectTaskClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-b">
+      <label class="field"><span>Title</span>
+        <input id="projectTaskName" placeholder="What needs doing?" autocomplete="off"></label>
+      <div class="grid cols-2" style="gap:12px 16px">
+        <label class="field mb-0"><span>Priority</span>
+          <select id="projectTaskPriority">{% for p in Priority %}<option value="{{ p.value }}" {{ 'selected' if p.value == 'Medium' }}>{{ p.value }}</option>{% endfor %}</select></label>
+        <label class="field mb-0"><span>Due date</span><input type="date" id="projectTaskDue"></label>
+      </div>
+      <label class="field mb-0" style="margin-top:14px"><span>Assignees</span>
+        <div class="wrap" id="projectTaskAssignees" style="gap:8px;margin-top:4px">
+          {% for member in assignee_opts %}
+          <label class="pick">
+            <input type="checkbox" value="{{ member.id }}" {{ 'checked' if member.id == user.id }}>
+            <span class="pick-chip">{{ avatar(member, 'sm') }} {{ member.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </label>
+      <div id="projectTaskError" class="dim" style="color:var(--red);font-size:12px;margin-top:10px" hidden></div>
+    </div>
+    <div class="modal-f">
+      <button type="button" class="btn" id="projectTaskCancel">Cancel</button>
+      <button type="button" class="btn primary" id="projectTaskCreate">Create task</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="grid cols-2" style="margin-top:26px">
   <div>
     <div class="section-title"><h2>Latest reports</h2><div class="line"></div></div>
@@ -190,6 +231,68 @@
     input.addEventListener("input", function () {
       btn.disabled = input.value.trim() !== input.dataset.name;
     });
+  })();
+</script>
+{% endif %}
+{% if can_add %}
+<script>
+  (function () {
+    var modal = document.getElementById("projectTaskModal");
+    var open = document.getElementById("projectAddTask");
+    var close = document.getElementById("projectTaskClose");
+    var cancel = document.getElementById("projectTaskCancel");
+    var create = document.getElementById("projectTaskCreate");
+    var name = document.getElementById("projectTaskName");
+    var priority = document.getElementById("projectTaskPriority");
+    var due = document.getElementById("projectTaskDue");
+    var assignees = document.getElementById("projectTaskAssignees");
+    var error = document.getElementById("projectTaskError");
+    if (!modal || !open) return;
+
+    function closeModal() { modal.hidden = true; }
+    function openModal() {
+      name.value = "";
+      due.value = "";
+      priority.value = "Medium";
+      error.hidden = true;
+      assignees.querySelectorAll("input[type=checkbox]").forEach(function (input) {
+        input.checked = input.value === modal.dataset.me;
+      });
+      modal.hidden = false;
+      setTimeout(function () { name.focus(); }, 30);
+    }
+    async function createTask() {
+      if (!name.value.trim()) { name.focus(); return; }
+      create.disabled = true;
+      error.hidden = true;
+      try {
+        var response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: Number(modal.dataset.project),
+            title: name.value.trim(),
+            priority: priority.value,
+            due_date: due.value || null,
+            assignees: Array.from(assignees.querySelectorAll("input:checked")).map(function (input) { return Number(input.value); })
+          })
+        });
+        var data = await response.json();
+        if (!data.ok) throw new Error(data.error || "Task could not be created.");
+        window.location.reload();
+      } catch (err) {
+        error.textContent = err.message;
+        error.hidden = false;
+        create.disabled = false;
+      }
+    }
+    open.addEventListener("click", openModal);
+    close.addEventListener("click", closeModal);
+    cancel.addEventListener("click", closeModal);
+    create.addEventListener("click", createTask);
+    name.addEventListener("keydown", function (event) { if (event.key === "Enter") createTask(); });
+    modal.addEventListener("click", function (event) { if (event.target === modal) closeModal(); });
+    document.addEventListener("keydown", function (event) { if (event.key === "Escape" && !modal.hidden) closeModal(); });
   })();
 </script>
 {% endif %}
