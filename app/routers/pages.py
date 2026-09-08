@@ -340,6 +340,22 @@ def board(request: Request, project_id: int | None = None,
 # ---------------------------------------------------------------------------
 # Task detail (comments live here)
 # ---------------------------------------------------------------------------
+@router.get("/tasks/recent")
+def recent_tasks(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    tasks = list(
+        db.scalars(
+            select(Task)
+            .options(selectinload(Task.project))
+            .where(Task.status == TaskStatus.done)
+            .order_by(Task.updated_at.desc())
+            .limit(6)
+        )
+    )
+    return templates.TemplateResponse(request, "tasks.html", {
+        "user": user, "nav": "board", "tasks": tasks,
+    })
+
+
 @router.get("/tasks/{task_id}")
 def task_detail(task_id: int, request: Request,
                 user: User = Depends(require_user), db: Session = Depends(get_db)):

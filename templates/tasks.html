@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import badge %}
+{% block title %}Recently Completed Tasks{% endblock %}
+{% block kicker %}Work queue{% endblock %}
+{% block heading %}Recently Completed Tasks{% endblock %}
+
+{% block topbar_actions %}
+<a class="btn sm" href="/dashboard">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div class="card pad">
+  {% for task in tasks %}
+  <div class="between" style="padding:12px 0;{{ 'border-top:1px solid var(--line-soft)' if not loop.first }}">
+    <div>
+      <a href="/tasks/{{ task.id }}"><b>{{ task.title }}</b></a>
+      <div class="dim" style="font-size:12px;margin-top:4px">
+        <span class="mono">{{ task.code }}</span> · <a href="/projects/{{ task.project.id }}">{{ task.project.name }}</a>
+      </div>
+    </div>
+    <div style="text-align:right">
+      {{ badge(task.status) }}
+      <div class="dim mono" style="font-size:11px;margin-top:5px">{{ task.updated_at|stamp }}</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="dim">No completed tasks yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}
