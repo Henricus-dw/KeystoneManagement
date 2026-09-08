@@ -6,18 +6,13 @@
 
 {% block head %}
 <style>
-  .task-status-control { display:inline-flex; align-items:center; gap:8px; margin:0; }
-  .task-status-control span { color:var(--dim); font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; }
-  .task-status-control select { width:auto; min-width:128px; padding-top:7px; padding-bottom:7px; }
+  .task-status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:10px; }
+  .task-status-row select { width:auto; min-width:140px; padding-top:7px; padding-bottom:7px; }
 </style>
 {% endblock %}
 
 {% block topbar_actions %}
-  <label class="task-status-control"><span>Status</span>
-    <select id="taskStatus" aria-label="Task status">
-      {% for status in TASK_COLUMNS %}<option value="{{ status.value }}" {{ 'selected' if status == task.status }}>{{ status.value }}</option>{% endfor %}
-    </select>
-  </label>
+  {{ badge(task.status) }}
   <a class="btn sm" href="/board?project_id={{ task.project_id }}">← Board</a>
 {% endblock %}
 
@@ -64,8 +59,11 @@
       <span class="dim mono" style="font-size:11px;letter-spacing:.1em">{{ label }}</span><span>{{ value|safe }}</span>
     </div>
     {% endmacro %}
-    <div class="between" style="padding-bottom:10px">
-      <span class="dim mono" style="font-size:11px;letter-spacing:.1em">STATUS</span>{{ badge(task.status) }}
+    <div class="task-status-row">
+      <span class="dim mono" style="font-size:11px;letter-spacing:.1em">STATUS</span>
+      <select id="taskStatus" aria-label="Task status">
+        {% for status in TASK_COLUMNS %}<option value="{{ status.value }}" {{ 'selected' if status == task.status }}>{{ status.value }}</option>{% endfor %}
+      </select>
     </div>
     {{ row('PRIORITY', badge(task.priority)) }}
     {{ row('PROJECT', '<a href="/projects/%s">%s</a>'|format(task.project_id, task.project.name)) }}
