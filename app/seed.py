@@ -67,6 +67,20 @@ def seed() -> None:
     init_db()
     with SessionLocal() as db:
         if db.scalar(select(User).limit(1)):
+            taskeen = db.scalar(select(User).where(User.email == "taskeen@professional.za.com"))
+            if not taskeen:
+                db.add(User(
+                    name="Taskeen Vallee",
+                    email="taskeen@professional.za.com",
+                    password_hash=hash_password(DEFAULT_PASSWORD),
+                    role=UserRole.developer,
+                    title="Manager",
+                    accent="#7AF5C7",
+                ))
+                db.commit()
+            elif taskeen.title != "Manager":
+                taskeen.title = "Manager"
+                db.commit()
             return  # already seeded
 
         # -- People ---------------------------------------------------------
@@ -82,7 +96,10 @@ def seed() -> None:
         darryl = User(name="Darryl Okonkwo", email="darryl@professional.aero",
                       password_hash=hash_password(DEFAULT_PASSWORD),
                       role=UserRole.developer, title="Full-stack Developer", accent="#7C9CF5")
-        db.add_all([jean, adele, henri, darryl])
+        taskeen = User(name="Taskeen Vallee", email="taskeen@professional.za.com",
+                       password_hash=hash_password(DEFAULT_PASSWORD),
+                       role=UserRole.developer, title="Manager", accent="#7AF5C7")
+        db.add_all([jean, adele, henri, darryl, taskeen])
         db.flush()
 
         # -- Projects -------------------------------------------------------
