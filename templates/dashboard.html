@@ -11,6 +11,7 @@
   .hero .ringcard .legend { display:flex; flex-direction:column; gap:10px; }
   .hero .ringcard .legend div { font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:8px; }
   .hero .ringcard .legend b { color:var(--text); font-family:var(--mono); }
+  .stat-action { width:100%; color:inherit; text-align:left; font:inherit; cursor:pointer; }
   @media (max-width: 1100px){ .hero { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
@@ -34,36 +35,85 @@
   </div>
 
   <div class="grid cols-3" style="align-content:start">
+    {% set development_count = active|selectattr('status.value','equalto','Development')|list|length %}
+    {% if development_count %}
     <a class="card pad stat" href="/projects?status=Development">
+    {% else %}
+    <button class="card pad stat stat-action" type="button" data-empty-message="There are no projects in development.">
+    {% endif %}
       <div class="kicker">In development</div>
-      <div class="num">{{ active|selectattr('status.value','equalto','Development')|list|length }}</div>
+      <div class="num">{{ development_count }}</div>
       <div class="sub">projects actively being built</div>
+    {% if development_count %}
     </a>
+    {% else %}
+    </button>
+    {% endif %}
+    {% if stats.at_risk %}
     <a class="card pad stat warn" href="/projects?health=At%20Risk">
+    {% else %}
+    <button class="card pad stat stat-action warn" type="button" data-empty-message="There are no projects at risk.">
+    {% endif %}
       <div class="kicker">At risk</div>
       <div class="num">{{ stats.at_risk }}</div>
       <div class="sub">need attention this week</div>
+    {% if stats.at_risk %}
     </a>
+    {% else %}
+    </button>
+    {% endif %}
+    {% if waiting|length %}
     <a class="card pad stat" href="/projects?status=Waiting%20on%20Client">
+    {% else %}
+    <button class="card pad stat stat-action" type="button" data-empty-message="There are no projects that are waiting on the client.">
+    {% endif %}
       <div class="kicker">Waiting on client</div>
       <div class="num">{{ waiting|length }}</div>
       <div class="sub">blocked on external input</div>
+    {% if waiting|length %}
     </a>
+    {% else %}
+    </button>
+    {% endif %}
+    {% if stats.total_projects %}
     <a class="card pad stat" href="/projects">
+    {% else %}
+    <button class="card pad stat stat-action" type="button" data-empty-message="There are no projects yet.">
+    {% endif %}
       <div class="kicker">Total projects</div>
       <div class="num">{{ stats.total_projects }}</div>
       <div class="sub">across the portfolio</div>
+    {% if stats.total_projects %}
     </a>
+    {% else %}
+    </button>
+    {% endif %}
+    {% if recent_done|length %}
     <a class="card pad stat" href="/tasks/recent">
+    {% else %}
+    <button class="card pad stat stat-action" type="button" data-empty-message="There are no recently completed tasks.">
+    {% endif %}
       <div class="kicker">Recently completed tasks</div>
       <div class="num">{{ recent_done|length }}</div>
       <div class="sub">tasks shipped lately</div>
+    {% if recent_done|length %}
     </a>
+    {% else %}
+    </button>
+    {% endif %}
+    {% if stats.team %}
     <a class="card pad stat accent" href="/team">
+    {% else %}
+    <button class="card pad stat stat-action accent" type="button" data-empty-message="There are no team members yet.">
+    {% endif %}
       <div class="kicker">Team members</div>
       <div class="num">{{ stats.team }}</div>
       <div class="sub">developers & managers</div>
+    {% if stats.team %}
     </a>
+    {% else %}
+    </button>
+    {% endif %}
   </div>
 </div>
 
@@ -131,10 +181,48 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="emptyMetricModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="emptyMetricTitle">
+    <div class="modal-h">
+      <div>
+        <div class="kicker">Nothing to show</div>
+        <h3 id="emptyMetricTitle">No matching records</h3>
+      </div>
+      <button type="button" class="modal-x" id="emptyMetricClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-b"><p id="emptyMetricMessage" class="dim" style="margin:0"></p></div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 {% if welcome %}
 <!-- No-JS fallback path lands here; the entrance already played for JS users. -->
 {% endif %}
+<script>
+  (function () {
+    var modal = document.getElementById("emptyMetricModal");
+    var message = document.getElementById("emptyMetricMessage");
+    var close = document.getElementById("emptyMetricClose");
+    if (!modal || !message || !close) return;
+
+    function closeModal() { modal.hidden = true; }
+
+    document.querySelectorAll("[data-empty-message]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        message.textContent = button.dataset.emptyMessage;
+        modal.hidden = false;
+        close.focus();
+      });
+    });
+    close.addEventListener("click", closeModal);
+    modal.addEventListener("click", function (event) {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !modal.hidden) closeModal();
+    });
+  })();
+</script>
 {% endblock %}
