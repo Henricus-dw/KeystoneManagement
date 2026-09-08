@@ -105,7 +105,13 @@
           try { input.showPicker(); } catch (error) {}
         }
       });
-      input.addEventListener("change", syncDateRange);
+      input.addEventListener("change", function (event) {
+        syncDateRange();
+        if (input === from) {
+          event.stopPropagation();
+          to.focus();
+        }
+      });
     });
 
     syncDateRange();
