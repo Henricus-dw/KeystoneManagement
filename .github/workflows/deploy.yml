@@ -16,8 +16,8 @@ jobs:
           username: henridewitt
           key: ${{ secrets.KEYSTONE_SSH_KEY }}
           script: |
-           script: |
-           cd /var/www/keystone
-           GIT_SSH_COMMAND='ssh -i /home/henridewitt/.ssh/keystone_deploy_key -o IdentitiesOnly=yes' git fetch origin main
-           git reset --hard origin/main
-           sudo -n systemctl restart keystone.service
+            script: |
+            cd /var/www/keystone
+            GIT_SSH_COMMAND='ssh -i /home/henridewitt/.ssh/keystone_deploy_key -o IdentitiesOnly=yes' git fetch origin main
+            git reset --hard origin/main
+            sudo -n systemctl restart keystone.service
