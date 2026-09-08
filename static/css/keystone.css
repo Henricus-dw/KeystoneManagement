@@ -1138,6 +1138,8 @@ textarea {
   transition: .15s;
 }
 
+input[type="date"] { color-scheme: dark; accent-color: var(--teal-2); cursor: pointer; }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: sepia(1) saturate(2) hue-rotate(95deg); opacity: .9; cursor: pointer; }
 textarea {
   resize: vertical;
   min-height: 80px;
