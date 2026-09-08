@@ -29,6 +29,23 @@ Then open **http://127.0.0.1:8000**.
 The database (`keystone.db`) is created and seeded with demo data on first run.
 Delete that file to start fresh.
 
+### Task assignment emails
+
+Task assignment emails are sent through the configured SMTP server. Set these
+environment variables on the host before starting Keystone:
+
+```bash
+export KEYSTONE_SMTP_HOST="smtp.example.com"
+export KEYSTONE_SMTP_PORT="587"
+export KEYSTONE_SMTP_USERNAME="keystone@example.com"
+export KEYSTONE_SMTP_PASSWORD="your-smtp-password"
+export KEYSTONE_SMTP_FROM="keystone@example.com"
+export KEYSTONE_APP_BASE_URL="https://keystone.example.com"
+```
+
+TLS is enabled by default. Set `KEYSTONE_SMTP_USE_TLS=false` only when the SMTP
+server does not support STARTTLS. Restart the app after setting these values.
+
 ### Demo logins (password is `keystone` for everyone)
 
 | Email                        | Role      |

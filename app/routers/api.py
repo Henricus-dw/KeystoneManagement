@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import require_user
 from app.models import Priority, Project, Task, TaskStatus, User, UserRole
+from app.notifications import send_task_assignment_email
 from app.services import log_activity, recompute_health
 
 router = APIRouter(prefix="/api")
@@ -75,6 +76,7 @@ def _avatar(u: User) -> dict:
 
 @router.post("/tasks")
 def create_task(payload: CreatePayload,
+                background_tasks: BackgroundTasks,
                 user: User = Depends(require_user), db: Session = Depends(get_db)):
     project = db.get(Project, payload.project_id)
     if not project or not payload.title.strip():
@@ -110,6 +112,16 @@ def create_task(payload: CreatePayload,
     log_activity(db, user=user, verb="created",
                  summary=f'created task "{task.title}"', project=project, task=task)
     db.commit()
+    for assignee in assignees:
+        background_tasks.add_task(
+            send_task_assignment_email,
+            recipient=assignee.email,
+            recipient_name=assignee.name,
+            task_id=task.id,
+            task_title=task.title,
+            project_name=project.name,
+            assigned_by=user.name,
+        )
     return {
         "ok": True,
         "task": {
