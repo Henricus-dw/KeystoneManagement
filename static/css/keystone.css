@@ -56,27 +56,27 @@
 
 /* ---- Tokens --------------------------------------------------- */
 :root {
-  --bg: #0d3b2d;
-  --bg-2: #124b38;
-  --surface: #155c46;
-  --surface-2: #1d735d;
-  --line: #2ea67d;
-  --line-soft: #227a64;
+  --bg: #121823;
+  --bg-2: #161d2a;
+  --surface: #1c2433;
+  --surface-2: #232d3e;
+  --line: #303d50;
+  --line-soft: #26313f;
 
-  --text: #eefff8;
-  --muted: #b5f3da;
-  --dim: #8fe3c4;
+  --text: #e7eef6;
+  --muted: #8a97a8;
+  --dim: #5a6675;
 
-  --teal: #b9ffea;
-  --teal-2: #7af5c7;
-  --teal-deep: #48d3a4;
-  --gold: #d8ffe9;
-  --gold-soft: #c4f7dd;
-  --red: #ff6b6b;
-  --violet: #d0ffe7;
-  --orange: #7ae0b1;
-  --blue: #ccffee;
-  --pink: #aef7d4;
+  --teal: #1cc4d8;
+  --teal-2: #3fe0c2;
+  --teal-deep: #1f6e7b;
+  --gold: #e0b23c;
+  --gold-soft: #c9a227;
+  --red: #f4677a;
+  --violet: #b08cf0;
+  --orange: #f0944c;
+  --blue: #7c9cf5;
+  --pink: #e0729b;
 
   --glow: 0 0 0 1px rgba(28, 196, 216, .0), 0 8px 30px -12px rgba(0, 0, 0, .7);
   --radius: 14px;
