@@ -41,8 +41,8 @@
         {% for v in verbs %}<option value="{{ v }}" {{ 'selected' if f.verb == v }}>{{ v|capitalize }}</option>{% endfor %}
       </select>
     </label>
-    <label class="field mb-0"><span>From</span><input class="date-filter" type="date" id="activityDateFrom" name="date_from" value="{{ f.date_from }}" aria-label="Activity date from"></label>
-    <label class="field mb-0"><span>To</span><input class="date-filter" type="date" id="activityDateTo" name="date_to" value="{{ f.date_to }}" aria-label="Activity date to"></label>
+    <label class="field mb-0"><span>From</span><input type="date" id="activityDateFrom" name="date_from" value="{{ f.date_from }}" aria-label="Activity date from"></label>
+    <label class="field mb-0"><span>To</span><input type="date" id="activityDateTo" name="date_to" value="{{ f.date_to }}" aria-label="Activity date to"></label>
     <label class="field mb-0">
       <span style="visibility:hidden">Clear</span>
       <a class="btn sm" href="/activity" style="height:42px">Clear</a>
@@ -84,8 +84,6 @@
 
 <style>
   .vdot { display:inline-block; width:9px; height:9px; border-radius:50%; }
-  .date-filter { accent-color: var(--teal); color-scheme: dark; }
-  .date-filter::-webkit-calendar-picker-indicator { filter: invert(77%) sepia(48%) saturate(789%) hue-rotate(130deg) brightness(91%); cursor: pointer; }
 </style>
 {% endblock %}
 
