@@ -9,15 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="proj-row" style="background:transparent;border:0;box-shadow:none;padding-bottom:0;margin-bottom:4px">
-  <div class="kicker">Project</div>
-  <div class="kicker">Client</div>
-  <div class="kicker">Progress</div>
-  <div class="kicker">Status</div>
-  <div class="kicker" style="text-align:right">Health</div>
-</div>
-
-{% for p in projects %}
+{% macro project_row(p) %}
 <a class="proj-row" href="/projects/{{ p.id }}">
   <div class="pname">
     <b>{{ p.name }}</b>
@@ -34,7 +26,22 @@
   <div>{{ badge(p.status) }}</div>
   <div style="text-align:right">{{ badge(p.health, outline=true) }}</div>
 </a>
-{% else %}
-<div class="empty-state">No projects yet.</div>
+{% endmacro %}
+
+<div class="proj-row" style="background:transparent;border:0;box-shadow:none;padding-bottom:0;margin-bottom:4px">
+  <div class="kicker">Project</div>
+  <div class="kicker">Client</div>
+  <div class="kicker">Progress</div>
+  <div class="kicker">Status</div>
+  <div class="kicker" style="text-align:right">Health</div>
+</div>
+
+{% for category, category_projects in [('Development', development_projects), ('Maintenance', maintenance_projects)] %}
+<div class="section-title" style="margin-top:{{ '0' if loop.first else '30px' }}px">
+  <h2>{{ category }}</h2><div class="line"></div>
+</div>
+{% for p in category_projects %}{{ project_row(p) }}{% else %}
+<div class="empty-state">No {{ category|lower }} projects.</div>
+{% endfor %}
 {% endfor %}
 {% endblock %}

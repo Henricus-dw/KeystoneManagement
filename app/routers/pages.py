@@ -101,6 +101,8 @@ def projects_list(request: Request, user: User = Depends(require_user), db: Sess
     projects = _projects(db)
     return templates.TemplateResponse(request, "projects.html", {
         "user": user, "nav": "projects", "projects": projects,
+        "development_projects": [p for p in projects if p.status != ProjectStatus.maintenance],
+        "maintenance_projects": [p for p in projects if p.status == ProjectStatus.maintenance],
     })
 
 
