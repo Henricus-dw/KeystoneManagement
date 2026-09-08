@@ -42,9 +42,9 @@
     </div>
     <div class="col-body" data-status="{{ status.value }}">
       {% for t in columns[status] %}
-      <div class="kcard" draggable="true" data-id="{{ t.id }}">
+      <a class="kcard" href="/tasks/{{ t.id }}" draggable="true" data-id="{{ t.id }}">
         <div class="between">
-          <a class="code" href="/tasks/{{ t.id }}">{{ t.code }}</a>
+          <span class="code">{{ t.code }}</span>
           {% if t.priority.value in ['High','Critical'] %}{{ badge(t.priority) }}{% endif %}
         </div>
         <div class="ktitle">{{ t.title }}</div>
@@ -52,7 +52,7 @@
           {{ stack(t.assignees, 3) }}
           {% if t.due_date %}<span class="dim mono" style="font-size:10.5px">{{ t.due_date|shortdate }}</span>{% endif %}
         </div>
-      </div>
+      </a>
       {% endfor %}
       {% if can_add %}<button class="add-card" data-add="{{ status.value }}">+ Add task</button>{% endif %}
     </div>

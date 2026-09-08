@@ -143,8 +143,9 @@
   }
 
   function buildCard(addBtn, task) {
-    const card = document.createElement("div");
+    const card = document.createElement("a");
     card.className = "kcard";
+    card.href = `/tasks/${task.id}`;
     card.draggable = true;
     card.dataset.id = task.id;
 
@@ -156,7 +157,7 @@
     const due = task.due ? `<span class="dim mono" style="font-size:10.5px">${escapeHtml(task.due)}</span>` : "";
 
     card.innerHTML =
-      `<div class="between"><a class="code" href="/tasks/${task.id}">${task.code}</a>${prio}</div>` +
+      `<div class="between"><span class="code">${task.code}</span>${prio}</div>` +
       `<div class="ktitle">${escapeHtml(task.title)}</div>` +
       `<div class="kfoot"><div class="avatar-stack">${avatars}</div>${due}</div>`;
     addBtn.parentNode.insertBefore(card, addBtn);
