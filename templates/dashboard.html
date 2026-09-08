@@ -34,36 +34,36 @@
   </div>
 
   <div class="grid cols-3" style="align-content:start">
-    <div class="card pad stat">
+    <a class="card pad stat" href="/projects?status=Development">
       <div class="kicker">In development</div>
       <div class="num">{{ active|selectattr('status.value','equalto','Development')|list|length }}</div>
       <div class="sub">projects actively being built</div>
-    </div>
-    <div class="card pad stat warn">
+    </a>
+    <a class="card pad stat warn" href="/projects?health=At%20Risk">
       <div class="kicker">At risk</div>
       <div class="num">{{ stats.at_risk }}</div>
       <div class="sub">need attention this week</div>
-    </div>
-    <div class="card pad stat">
+    </a>
+    <a class="card pad stat" href="/projects?status=Waiting%20on%20Client">
       <div class="kicker">Waiting on client</div>
       <div class="num">{{ waiting|length }}</div>
       <div class="sub">blocked on external input</div>
-    </div>
-    <div class="card pad stat">
+    </a>
+    <a class="card pad stat" href="/projects">
       <div class="kicker">Total projects</div>
       <div class="num">{{ stats.total_projects }}</div>
       <div class="sub">across the portfolio</div>
-    </div>
-    <div class="card pad stat">
+    </a>
+    <a class="card pad stat" href="/projects?status=Completed">
       <div class="kicker">Recently completed</div>
       <div class="num">{{ recent_done|length }}</div>
       <div class="sub">tasks shipped lately</div>
-    </div>
-    <div class="card pad stat accent">
+    </a>
+    <a class="card pad stat accent" href="/team">
       <div class="kicker">Team members</div>
       <div class="num">{{ stats.team }}</div>
       <div class="sub">developers & managers</div>
-    </div>
+    </a>
   </div>
 </div>
 

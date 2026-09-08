@@ -97,8 +97,20 @@ def dashboard(request: Request, user: User = Depends(require_user), db: Session 
 # Projects
 # ---------------------------------------------------------------------------
 @router.get("/projects")
-def projects_list(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
+def projects_list(
+    request: Request,
+    status: str = "",
+    health: str = "",
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
     projects = _projects(db)
+    selected_status = next((s for s in ProjectStatus if s.value == status), None)
+    selected_health = next((h for h in ProjectHealth if h.value == health), None)
+    if selected_status:
+        projects = [p for p in projects if p.status == selected_status]
+    if selected_health:
+        projects = [p for p in projects if p.health == selected_health]
     return templates.TemplateResponse(request, "projects.html", {
         "user": user, "nav": "projects", "projects": projects,
         "development_projects": [p for p in projects if p.status != ProjectStatus.maintenance],
