@@ -112,10 +112,21 @@ def projects_list(
         projects = [p for p in projects if p.status == selected_status]
     if selected_health:
         projects = [p for p in projects if p.health == selected_health]
+    planning_projects = [p for p in projects if p.status == ProjectStatus.planning]
+    development_projects = [p for p in projects if p.status == ProjectStatus.development]
+    testing_projects = [p for p in projects if p.status == ProjectStatus.testing]
+    maintenance_projects = [p for p in projects if p.status == ProjectStatus.maintenance]
+    other_projects = [p for p in projects if p.status not in {
+        ProjectStatus.planning, ProjectStatus.development,
+        ProjectStatus.testing, ProjectStatus.maintenance,
+    }]
     return templates.TemplateResponse(request, "projects.html", {
         "user": user, "nav": "projects", "projects": projects,
-        "development_projects": [p for p in projects if p.status != ProjectStatus.maintenance],
-        "maintenance_projects": [p for p in projects if p.status == ProjectStatus.maintenance],
+        "planning_projects": planning_projects,
+        "development_projects": development_projects,
+        "testing_projects": testing_projects,
+        "maintenance_projects": maintenance_projects,
+        "other_projects": other_projects,
         "filters_active": bool(selected_status or selected_health),
     })
 

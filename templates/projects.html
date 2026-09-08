@@ -36,8 +36,14 @@
   <div class="kicker" style="text-align:right">Health</div>
 </div>
 
-{% for category, category_projects in [('Development', development_projects), ('Maintenance', maintenance_projects)] %}
-{% if category_projects or not filters_active %}
+{% for category, category_projects in [
+  ('Planning', planning_projects),
+  ('Development', development_projects),
+  ('Testing', testing_projects),
+  ('Maintenance', maintenance_projects),
+  ('Other', other_projects)
+] %}
+{% if category_projects or (not filters_active and category != 'Other') %}
 <div class="section-title" style="margin-top:{{ '0' if loop.first else '30px' }}px">
   <h2>{{ category }}</h2><div class="line"></div>
 </div>
