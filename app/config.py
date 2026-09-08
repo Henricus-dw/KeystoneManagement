@@ -12,6 +12,7 @@ UPLOADS_DIR = STATIC_DIR / "uploads"
 # authenticated route, so they never need to sit under the public /static mount.
 DATA_DIR = BASE_DIR / "data"
 SERVER_IMAGES_DIR = DATA_DIR / "server_images"
+PROJECT_UPLOADS_DIR = DATA_DIR / "project_uploads"
 DB_PATH = BASE_DIR / "keystone.db"
 
 DATABASE_URL = f"sqlite:///{DB_PATH}"
@@ -33,3 +34,4 @@ APP_BASE_URL = os.getenv("KEYSTONE_APP_BASE_URL", "http://127.0.0.1:8000").rstri
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 SERVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+PROJECT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)

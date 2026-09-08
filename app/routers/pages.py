@@ -1,14 +1,17 @@
 """All server-rendered pages behind the login."""
 from __future__ import annotations
 
+import secrets
 from datetime import date
+from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.changelog import CHANGELOG
+from app.config import PROJECT_UPLOADS_DIR
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
 from app.reporting import build_activity_pdf
@@ -17,6 +20,7 @@ from app.models import (
     Comment,
     Priority,
     Project,
+    ProjectAttachment,
     ProgressReport,
     ProjectHealth,
     ProjectStatus,
@@ -31,6 +35,13 @@ from app.services import log_activity, recompute_health
 from app.templating import templates
 
 router = APIRouter()
+
+MAX_PROJECT_FILE_BYTES = 25 * 1024 * 1024
+PROJECT_FILE_TYPES = {
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".txt", ".csv", ".zip",
+}
 
 AT_RISK_HEALTH = (ProjectHealth.at_risk, ProjectHealth.blocked, ProjectHealth.delayed)
 
@@ -210,6 +221,72 @@ def _can_edit_project(user: User, project: Project) -> bool:
     return user.role in (UserRole.admin, UserRole.manager) or project.created_by == user.id
 
 
+def _can_upload_project(user: User, project: Project) -> bool:
+    return _can_edit_project(user, project) or user in project.members
+
+
+def _project_file_path(attachment: ProjectAttachment) -> Path | None:
+    base = PROJECT_UPLOADS_DIR.resolve()
+    path = (base / attachment.filepath).resolve()
+    if base not in path.parents or not path.is_file():
+        return None
+    return path
+
+
+@router.post("/projects/{project_id}/attachments")
+async def upload_project_attachment(
+    project_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    project = db.get(Project, project_id)
+    if not project:
+        return RedirectResponse("/projects", status_code=303)
+    if not _can_upload_project(user, project):
+        return RedirectResponse(f"/projects/{project_id}?upload_error=forbidden", status_code=303)
+
+    filename = Path(file.filename or "").name
+    suffix = Path(filename).suffix.lower()
+    if not filename or suffix not in PROJECT_FILE_TYPES:
+        return RedirectResponse(f"/projects/{project_id}?upload_error=type", status_code=303)
+
+    contents = await file.read(MAX_PROJECT_FILE_BYTES + 1)
+    if len(contents) > MAX_PROJECT_FILE_BYTES:
+        return RedirectResponse(f"/projects/{project_id}?upload_error=size", status_code=303)
+
+    stored_name = f"{secrets.token_hex(16)}{suffix}"
+    project_dir = PROJECT_UPLOADS_DIR / str(project_id)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / stored_name).write_bytes(contents)
+    db.add(ProjectAttachment(
+        project_id=project_id,
+        filename=filename[:255],
+        filepath=f"{project_id}/{stored_name}",
+        content_type=file.content_type or "application/octet-stream",
+        size=len(contents),
+        uploaded_by=user.id,
+    ))
+    db.commit()
+    return RedirectResponse(f"/projects/{project_id}?uploaded=1", status_code=303)
+
+
+@router.get("/projects/{project_id}/attachments/{attachment_id}")
+def download_project_attachment(
+    project_id: int,
+    attachment_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    attachment = db.get(ProjectAttachment, attachment_id)
+    if not attachment or attachment.project_id != project_id:
+        return RedirectResponse(f"/projects/{project_id}", status_code=303)
+    path = _project_file_path(attachment)
+    if not path:
+        return RedirectResponse(f"/projects/{project_id}?upload_error=missing", status_code=303)
+    return FileResponse(path, media_type=attachment.content_type, filename=attachment.filename)
+
+
 @router.get("/projects/{project_id}/edit")
 def edit_project_form(project_id: int, request: Request,
                       user: User = Depends(require_user), db: Session = Depends(get_db)):
@@ -302,6 +379,10 @@ def delete_project(project_id: int, confirm: str = Form(""),
         a.task_id = None
     for r in db.scalars(select(ProgressReport).where(ProgressReport.project_id == project_id)):
         r.project_id = None  # keep the developer's stand-up, just unlink the project
+    for attachment in project.attachments:
+        path = _project_file_path(attachment)
+        if path:
+            path.unlink(missing_ok=True)
     # Record the deletion itself (no project link, so it survives the delete).
     log_activity(db, user=user, verb="deleted",
                  summary=f'deleted project "{name}" ({task_count} task{"" if task_count == 1 else "s"})')
@@ -337,8 +418,11 @@ def project_detail(project_id: int, request: Request,
         "user": user, "nav": "projects", "project": project,
         "columns": columns, "reports": reports, "activities": activities,
         "delete_error": request.query_params.get("delete_error"),
+        "upload_error": request.query_params.get("upload_error"),
+        "uploaded": request.query_params.get("uploaded") == "1",
         "can_delete": user.role in (UserRole.admin, UserRole.manager),
         "can_edit": _can_edit_project(user, project),
+        "can_upload": _can_upload_project(user, project),
     })
 
 

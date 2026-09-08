@@ -171,6 +171,9 @@ class Project(Base):
     tasks: Mapped[list[Task]] = relationship(
         back_populates="project", cascade="all, delete-orphan", order_by="Task.order"
     )
+    attachments: Mapped[list[ProjectAttachment]] = relationship(
+        back_populates="project", cascade="all, delete-orphan", order_by="ProjectAttachment.created_at.desc()"
+    )
 
     # Progress is *derived* from task state rather than a hand-edited number, so
     # it can never drift out of sync with reality.
@@ -291,6 +294,21 @@ class Attachment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     task: Mapped[Task] = relationship(back_populates="attachments")
+
+
+class ProjectAttachment(Base):
+    __tablename__ = "project_attachments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    filename: Mapped[str] = mapped_column(String(255))
+    filepath: Mapped[str] = mapped_column(String(500))
+    content_type: Mapped[str] = mapped_column(String(120), default="")
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    uploaded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    project: Mapped[Project] = relationship(back_populates="attachments")
 
 
 class Server(Base):
