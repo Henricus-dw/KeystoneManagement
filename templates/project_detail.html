@@ -9,11 +9,12 @@
   {{ badge(project.health, outline=true) }}
   {% if can_edit %}<a class="btn sm" href="/projects/{{ project.id }}/edit">Edit</a>{% endif %}
   {% set can_board = user.role.value in ['Admin', 'Manager'] or user in project.members %}
-  {% if can_add %}<button class="btn primary sm" type="button" id="projectAddTask">+ Add task</button>{% endif %}
+  {% if can_board %}<button class="btn primary sm" type="button" id="projectAddTask">+ Add task</button>{% endif %}
   {% if can_board %}<a class="btn sm" href="/board?project_id={{ project.id }}">Open board →</a>{% endif %}
 {% endblock %}
 
 {% block content %}
+{% set can_add = user.role.value in ['Admin', 'Manager'] or user in project.members %}
 <div class="grid cols-4" style="margin-bottom:22px">
   <div class="card pad stat accent">
     <div class="kicker">Progress</div>
