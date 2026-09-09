@@ -130,19 +130,21 @@ def send_task_assignment_email(
 
 
 def send_hours_report_email(*, recipient: str, submitter_email: str,
-                            submitter_name: str, month: str, customer: str,
-                            duration: str, description: str,
+                            submitter_name: str, month: str, entries: list[dict[str, str]],
                             workbook: bytes, filename: str) -> None:
     """Send a submitted monthly hours workbook through Microsoft Graph."""
+    entry_lines = "\n".join(
+        f"- {entry['customer']}: {entry['duration']} hours"
+        + (f" - {entry['description']}" if entry["description"] else "")
+        for entry in entries
+    )
     _send_message(
         recipient=recipient,
         cc=[submitter_email],
         subject=f"Monthly hours report - {month} - {submitter_name}",
         body=(
             f"{submitter_name} submitted their monthly hours for {month}.\n\n"
-            f"Customer: {customer}\n"
-            f"Duration: {duration} hours\n"
-            f"Description: {description or '—'}\n"
+            f"Entries:\n{entry_lines}\n"
         ),
         attachments=[(
             filename,

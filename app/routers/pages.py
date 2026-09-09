@@ -675,6 +675,7 @@ def _hours_template(request: Request, user: User, customers: list[str], **values
 @router.get("/hours-tracker")
 def hours_tracker(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     return _hours_template(request, user, HOURS_CUSTOMERS,
+                           entries=[{"customer": "", "other_customer": "", "duration": "", "description": ""}],
                            submitted=request.query_params.get("submitted") == "1")
 
 
@@ -682,29 +683,39 @@ def hours_tracker(request: Request, user: User = Depends(require_user), db: Sess
 def submit_hours(
     background_tasks: BackgroundTasks,
     request: Request,
-    customer: str = Form(...),
-    other_customer: str = Form(""),
-    duration: str = Form(...),
+    customer: list[str] = Form(...),
+    other_customer: list[str] = Form(default=[]),
+    duration: list[str] = Form(...),
     month: str = Form(...),
-    description: str = Form(""),
+    description: list[str] = Form(default=[]),
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
     customers = HOURS_CUSTOMERS
-    customer = customer.strip()
-    other_customer = other_customer.strip()
-    description = description.strip()
     errors = []
-    if customer not in customers and customer != "Other":
-        errors.append("Select a customer from the list.")
-    if customer == "Other" and not other_customer:
-        errors.append("Enter the customer name when selecting Other.")
-    try:
-        hours = float(duration)
-        if hours <= 0 or hours > 744:
-            raise ValueError
-    except ValueError:
-        errors.append("Duration must be a number greater than 0 and no more than 744.")
+    entries = []
+    row_count = max(len(customer), len(duration), len(other_customer), len(description), 1)
+    for index in range(row_count):
+        selected_customer = customer[index].strip() if index < len(customer) else ""
+        custom_customer = other_customer[index].strip() if index < len(other_customer) else ""
+        row_duration = duration[index].strip() if index < len(duration) else ""
+        row_description = description[index].strip() if index < len(description) else ""
+        entries.append({
+            "customer": selected_customer,
+            "other_customer": custom_customer,
+            "duration": row_duration,
+            "description": row_description,
+        })
+        if selected_customer not in customers:
+            errors.append(f"Row {index + 1}: select a customer from the list.")
+        if selected_customer == "Other" and not custom_customer:
+            errors.append(f"Row {index + 1}: enter a Customer Name when selecting Other.")
+        try:
+            hours = float(row_duration)
+            if hours <= 0 or hours > 744:
+                raise ValueError
+        except ValueError:
+            errors.append(f"Row {index + 1}: duration must be greater than 0 and no more than 744.")
     try:
         parsed_month = date.fromisoformat(f"{month}-01")
     except ValueError:
@@ -714,9 +725,7 @@ def submit_hours(
         errors.append("Monthly hours reporting email is not configured yet.")
     if errors:
         return _hours_template(request, user, customers, error=" ".join(errors),
-                               values={"customer": customer, "other_customer": other_customer,
-                                       "duration": duration, "month": month,
-                                       "description": description})
+                               entries=entries, month=month)
 
     try:
         from openpyxl import Workbook
@@ -727,18 +736,26 @@ def submit_hours(
             user,
             customers,
             error="Excel export is unavailable because the openpyxl package is not installed.",
-            values={"customer": customer, "other_customer": other_customer,
-                    "duration": duration, "month": month, "description": description},
+            entries=entries,
+            month=month,
         )
 
-    customer_name = other_customer if customer == "Other" else customer
     month_label = parsed_month.strftime("%B %Y")
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Monthly Hours"
     headers = ["Internal customer", "Duration (hours)", "Month", "Description", "IT Tech"]
     sheet.append(headers)
-    sheet.append([customer_name, hours, month_label, description, user.name])
+    report_rows = []
+    for entry in entries:
+        customer_name = entry["other_customer"] if entry["customer"] == "Other" else entry["customer"]
+        hours = float(entry["duration"])
+        report_rows.append({
+            "customer": customer_name,
+            "duration": f"{hours:g}",
+            "description": entry["description"],
+        })
+        sheet.append([customer_name, hours, month_label, entry["description"], user.name])
     for cell in sheet[1]:
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="17324D")
@@ -754,9 +771,7 @@ def submit_hours(
         submitter_email=user.email,
         submitter_name=user.name,
         month=month_label,
-        customer=customer_name,
-        duration=f"{hours:g}",
-        description=description,
+        entries=report_rows,
         workbook=output.getvalue(),
         filename=filename,
     )
