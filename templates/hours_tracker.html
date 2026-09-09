@@ -25,7 +25,6 @@
 					{% for customer in customers %}
 					<option value="{{ customer }}" {{ 'selected' if values.customer == customer }}>{{ customer }}</option>
 					{% endfor %}
-					<option value="Other" {{ 'selected' if values.customer == 'Other' }}>Other</option>
 				</select>
 			</label>
 			<label class="field" id="other-customer-field" hidden>
