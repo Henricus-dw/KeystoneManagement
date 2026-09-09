@@ -10,8 +10,6 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, Up
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
 
 from app.changelog import CHANGELOG
 from app.config import HOURS_REPORT_RECIPIENT, PROJECT_UPLOADS_DIR
@@ -722,6 +720,19 @@ def submit_hours(
                                values={"customer": customer, "other_customer": other_customer,
                                        "duration": duration, "month": month,
                                        "description": description})
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+    except ImportError:
+        return _hours_template(
+            request,
+            user,
+            customers,
+            error="Excel export is unavailable because the openpyxl package is not installed.",
+            values={"customer": customer, "other_customer": other_customer,
+                    "duration": duration, "month": month, "description": description},
+        )
 
     customer_name = other_customer if customer == "Other" else customer
     month_label = parsed_month.strftime("%B %Y")
