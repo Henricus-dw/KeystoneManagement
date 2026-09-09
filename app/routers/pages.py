@@ -45,6 +45,10 @@ PROJECT_FILE_TYPES = {
 }
 
 AT_RISK_HEALTH = (ProjectHealth.at_risk, ProjectHealth.blocked, ProjectHealth.delayed)
+HOURS_CUSTOMERS = [
+    "Asimo", "CentralManagement", "Leave", "Logistics", "LogisticsSA",
+    "Polygraph", "Public", "Risk", "Services", "Other",
+]
 
 
 def _projects(db: Session) -> list[Project]:
@@ -670,11 +674,7 @@ def _hours_template(request: Request, user: User, customers: list[str], **values
 
 @router.get("/hours-tracker")
 def hours_tracker(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
-    customers = sorted({
-        client.strip() for client in db.scalars(select(Project.client))
-        if client and client.strip()
-    }, key=str.casefold)
-    return _hours_template(request, user, customers,
+    return _hours_template(request, user, HOURS_CUSTOMERS,
                            submitted=request.query_params.get("submitted") == "1")
 
 
@@ -690,10 +690,7 @@ def submit_hours(
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    customers = sorted({
-        client.strip() for client in db.scalars(select(Project.client))
-        if client and client.strip()
-    }, key=str.casefold)
+    customers = HOURS_CUSTOMERS
     customer = customer.strip()
     other_customer = other_customer.strip()
     description = description.strip()
