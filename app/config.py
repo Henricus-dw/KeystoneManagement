@@ -36,7 +36,10 @@ HOURS_REPORT_RECIPIENT = os.getenv(
 	"KEYSTONE_HOURS_REPORT_RECIPIENT",
 	"taskeen@professional.za.com",
 )
-APP_BASE_URL = os.getenv("KEYSTONE_APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+APP_BASE_URL = os.getenv(
+	"KEYSTONE_APP_BASE_URL",
+	"https://keystone.professionalgroup.co.za",
+).rstrip("/")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 SERVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)

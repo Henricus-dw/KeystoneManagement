@@ -24,7 +24,10 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
 ```
 
-Then open **http://127.0.0.1:8000**.
+For production, expose the app through the HTTPS reverse proxy at
+**https://keystone.professionalgroup.co.za**. Uvicorn should remain bound to
+`127.0.0.1:8000` behind that proxy; do not expose Uvicorn directly to the
+internet.
 
 The database (`keystone.db`) is created and seeded with demo data on first run.
 Delete that file to start fresh.
@@ -42,7 +45,7 @@ export KEYSTONE_GRAPH_CLIENT_ID="your-client-id"
 export KEYSTONE_GRAPH_CLIENT_SECRET="your-client-secret"
 export KEYSTONE_GRAPH_SENDER="keystonenotifications@professional.za.com"
 export KEYSTONE_HOURS_REPORT_RECIPIENT="hours@example.com"
-export KEYSTONE_APP_BASE_URL="https://keystone.example.com"
+export KEYSTONE_APP_BASE_URL="https://keystone.professionalgroup.co.za"
 ```
 
 The sender must be a mailbox the application is allowed to send as. Restart the
