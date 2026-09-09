@@ -10,11 +10,15 @@
 			<div><div class="kicker">Monthly submission</div><h3>Log your work</h3></div>
 			<span class="badge">{{ user.name }}</span>
 		</div>
+		<div class="notice" style="margin-bottom:16px">
+			<b>Total working hours required for {{ report_month_label }}</b><br>
+			<span class="dim">{{ required_hours }} hours, excluding weekends and South African public holidays. Submit by {{ due_date }} at 12:00 SAST.</span>
+		</div>
 		{% if submitted %}
-		<div class="notice success">Your hours report was created and queued for email delivery.</div>
+		<div class="notice success">Your hours were saved. The consolidated team workbook will be emailed after all four team members submit.</div>
 		{% endif %}
 		{% if error %}
-		<div class="notice danger">{{ error }}</div>
+		<div class="notice danger" id="hours-error" data-error="{{ error }}">{{ error }}</div>
 		{% endif %}
 		{% set entries = entries|default([{"customer": "", "other_customer": "", "duration": "", "description": ""}]) %}
 		<form method="post" action="/hours-tracker">
@@ -64,7 +68,7 @@
 	<aside class="card pad">
 		<div class="kicker">Submission guide</div>
 		<h3 style="margin:8px 0 14px">One report per month</h3>
-		<p class="dim" style="line-height:1.65;margin:0">Complete this form on the first of each month. The workbook will be sent to the configured reporting address, with a copy to your Keystone email.</p>
+		<p class="dim" style="line-height:1.65;margin:0">Complete this form on the first working day of each month. Once all four team members submit, one consolidated workbook with a separate tab per member is emailed to the configured reporting address.</p>
 		<div class="section-title" style="margin-top:24px"><h2>Required</h2><div class="line"></div></div>
 		<p class="dim" style="line-height:1.65;margin:0">Add as many customer entries as needed. Customer and duration are required for every entry; descriptions are optional.</p>
 	</aside>
@@ -118,5 +122,7 @@
 	addEntryButton.addEventListener('click', createEntry);
 	entriesContainer.querySelectorAll('[data-entry-row]').forEach(toggleOtherCustomer);
 	renumberEntries();
+	const errorNotice = document.getElementById('hours-error');
+	if (errorNotice?.dataset.error) alert(errorNotice.dataset.error);
 </script>
 {% endblock %}

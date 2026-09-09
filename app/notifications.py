@@ -153,6 +153,43 @@ def send_hours_report_email(*, recipient: str, submitter_email: str,
     )
 
 
+def send_consolidated_hours_email(*, recipient: str, month: str,
+                                  workbook: bytes, filename: str) -> None:
+    """Send the four-member consolidated monthly workbook."""
+    _send_message(
+        recipient=recipient,
+        subject=f"Team hours for {month}",
+        body=(
+            "Hello,\n\n"
+            f"Please find attached the consolidated team hours report for {month}.\n\n"
+            "The Excel file contains a separate worksheet for each team member."
+        ),
+        attachments=[(
+            filename,
+            workbook,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )],
+        kind="Consolidated monthly hours",
+    )
+
+
+def send_hours_reminder_email(*, recipients: list[str], missing_members: list[str],
+                              month: str, due_date: str) -> None:
+    """Remind members who have not submitted before the monthly deadline."""
+    for recipient, member in zip(recipients, missing_members):
+        _send_message(
+            recipient=recipient,
+            subject=f"Reminder: submit your hours for {month}",
+            body=(
+                "Hello,\n\n"
+                f"This is a reminder for {member} to submit their hours for {month}.\n"
+                f"The submission deadline is {due_date} at 12:00 SAST.\n\n"
+                "Please complete the Hours Tracker in Keystone."
+            ),
+            kind="Monthly hours reminder",
+        )
+
+
 def send_project_assignment_email(
     *,
     recipient: str,

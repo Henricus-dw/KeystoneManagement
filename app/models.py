@@ -18,6 +18,7 @@ import enum
 from datetime import date, datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     Column,
     Date,
     DateTime,
@@ -262,6 +263,32 @@ class ProgressReport(Base):
 
     user: Mapped[User] = relationship(back_populates="reports")
     project: Mapped[Project | None] = relationship()
+
+
+class MonthlyHoursSubmission(Base):
+    """One member's complete hours submission for a calendar month."""
+
+    __tablename__ = "monthly_hours_submissions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_month: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    entries: Mapped[str] = mapped_column(Text, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    user: Mapped[User] = relationship()
+
+
+class MonthlyHoursCycle(Base):
+    """Delivery state for a month's consolidated hours report and reminder."""
+
+    __tablename__ = "monthly_hours_cycles"
+
+    report_month: Mapped[date] = mapped_column(Date, primary_key=True)
+    reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    consolidated_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    consolidated_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Activity(Base):

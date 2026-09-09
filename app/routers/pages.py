@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import secrets
-from io import BytesIO
-from datetime import date
+import json
+from datetime import date, datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -15,6 +16,13 @@ from app.changelog import CHANGELOG
 from app.config import HOURS_REPORT_RECIPIENT, PROJECT_UPLOADS_DIR
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
+from app.hours import (
+    REQUIRED_MEMBER_EMAILS,
+    build_consolidated_workbook,
+    previous_month,
+    report_due_date,
+    working_hours,
+)
 from app.reporting import build_activity_pdf
 from app.models import (
     Activity,
@@ -25,12 +33,14 @@ from app.models import (
     ProgressReport,
     ProjectHealth,
     ProjectStatus,
+    MonthlyHoursCycle,
+    MonthlyHoursSubmission,
     Task,
     TaskStatus,
     User,
     UserRole,
 )
-from app.notifications import send_hours_report_email, send_project_assignment_email
+from app.notifications import send_consolidated_hours_email, send_hours_reminder_email, send_project_assignment_email
 from app.security import hash_password, verify_password
 from app.services import log_activity, recompute_health
 from app.templating import templates
@@ -672,10 +682,21 @@ def _hours_template(request: Request, user: User, customers: list[str], **values
     })
 
 
+def _hours_page_values(report_month: date) -> dict:
+    return {
+        "report_month_label": report_month.strftime("%B %Y"),
+        "required_hours": working_hours(report_month),
+        "due_date": report_due_date(report_month).strftime("%d %B %Y"),
+    }
+
+
 @router.get("/hours-tracker")
 def hours_tracker(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    report_month = previous_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
     return _hours_template(request, user, HOURS_CUSTOMERS,
                            entries=[{"customer": "", "other_customer": "", "duration": "", "description": ""}],
+                           month=report_month.strftime("%Y-%m"),
+                           **_hours_page_values(report_month),
                            submitted=request.query_params.get("submitted") == "1")
 
 
@@ -721,67 +742,56 @@ def submit_hours(
     except ValueError:
         parsed_month = None
         errors.append("Select a valid month.")
-    if not HOURS_REPORT_RECIPIENT:
-        errors.append("Monthly hours reporting email is not configured yet.")
+    required_hours = working_hours(parsed_month) if parsed_month else 0
+    submitted_hours = sum(
+        float(entry["duration"]) for entry in entries
+        if entry["duration"] and entry["duration"].replace(".", "", 1).isdigit()
+    )
+    if parsed_month and abs(submitted_hours - required_hours) > 0.001:
+        errors.append(
+            f"Your submitted total is {submitted_hours:g} hours, but {parsed_month.strftime('%B %Y')} "
+            f"requires exactly {required_hours} working hours."
+        )
     if errors:
         return _hours_template(request, user, customers, error=" ".join(errors),
-                               entries=entries, month=month)
+                               entries=entries, month=month,
+                               **(_hours_page_values(parsed_month) if parsed_month else {}))
 
-    try:
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill
-    except ImportError:
-        return _hours_template(
-            request,
-            user,
-            customers,
-            error="Excel export is unavailable because the openpyxl package is not installed.",
-            entries=entries,
-            month=month,
+    submission = db.scalar(select(MonthlyHoursSubmission).where(
+        MonthlyHoursSubmission.report_month == parsed_month,
+        MonthlyHoursSubmission.user_id == user.id,
+    ))
+    if submission:
+        submission.entries = json.dumps(entries)
+        submission.submitted_at = datetime.now(timezone.utc)
+    else:
+        db.add(MonthlyHoursSubmission(
+            report_month=parsed_month,
+            user_id=user.id,
+            entries=json.dumps(entries),
+        ))
+    cycle = db.get(MonthlyHoursCycle, parsed_month)
+    if not cycle:
+        cycle = MonthlyHoursCycle(report_month=parsed_month)
+        db.add(cycle)
+    db.commit()
+
+    submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
+        MonthlyHoursSubmission.report_month == parsed_month
+    ).options(selectinload(MonthlyHoursSubmission.user))))
+    submitted_emails = {submission.user.email for submission in submissions}
+    if not cycle.consolidated_sent and REQUIRED_MEMBER_EMAILS.issubset(submitted_emails):
+        workbook = build_consolidated_workbook(parsed_month, submissions)
+        background_tasks.add_task(
+            send_consolidated_hours_email,
+            recipient=HOURS_REPORT_RECIPIENT,
+            month=parsed_month.strftime("%B %Y"),
+            workbook=workbook,
+            filename=f"team-hours-{parsed_month.strftime('%Y-%m')}.xlsx",
         )
-
-    month_label = parsed_month.strftime("%B %Y")
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Monthly Hours"
-    headers = ["Internal customer", "Duration (hours)", "Description", "Month", "Year", "IT Tech"]
-    sheet.append(headers)
-    report_rows = []
-    for entry in entries:
-        customer_name = entry["other_customer"] if entry["customer"] == "Other" else entry["customer"]
-        hours = float(entry["duration"])
-        report_rows.append({
-            "customer": customer_name,
-            "duration": f"{hours:g}",
-            "description": entry["description"],
-        })
-        sheet.append([
-            customer_name,
-            hours,
-            entry["description"],
-            parsed_month.strftime("%B"),
-            parsed_month.year,
-            user.name,
-        ])
-    for cell in sheet[1]:
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="17324D")
-    for column, width in zip("ABCDEF", (28, 18, 55, 18, 12, 24)):
-        sheet.column_dimensions[column].width = width
-    sheet.freeze_panes = "A2"
-    output = BytesIO()
-    workbook.save(output)
-    filename = f"hours-{parsed_month.strftime('%Y-%m')}-{user.name.replace(' ', '-')}.xlsx"
-    background_tasks.add_task(
-        send_hours_report_email,
-        recipient=HOURS_REPORT_RECIPIENT,
-        submitter_email=user.email,
-        submitter_name=user.name,
-        month=month_label,
-        entries=report_rows,
-        workbook=output.getvalue(),
-        filename=filename,
-    )
+        cycle.consolidated_sent = True
+        cycle.consolidated_sent_at = datetime.now(timezone.utc)
+        db.commit()
     return RedirectResponse("/hours-tracker?submitted=1", status_code=303)
 
 
