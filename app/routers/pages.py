@@ -744,7 +744,7 @@ def submit_hours(
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Monthly Hours"
-    headers = ["Internal customer", "Duration (hours)", "Month", "Description", "IT Tech"]
+    headers = ["Internal customer", "Duration (hours)", "Description", "Month", "Year", "IT Tech"]
     sheet.append(headers)
     report_rows = []
     for entry in entries:
@@ -755,11 +755,18 @@ def submit_hours(
             "duration": f"{hours:g}",
             "description": entry["description"],
         })
-        sheet.append([customer_name, hours, month_label, entry["description"], user.name])
+        sheet.append([
+            customer_name,
+            hours,
+            entry["description"],
+            parsed_month.strftime("%B"),
+            parsed_month.year,
+            user.name,
+        ])
     for cell in sheet[1]:
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="17324D")
-    for column, width in zip("ABCDE", (28, 18, 18, 55, 24)):
+    for column, width in zip("ABCDEF", (28, 18, 55, 18, 12, 24)):
         sheet.column_dimensions[column].width = width
     sheet.freeze_panes = "A2"
     output = BytesIO()
