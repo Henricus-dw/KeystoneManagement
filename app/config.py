@@ -25,11 +25,10 @@ SESSION_COOKIE = "keystone_session"
 APP_NAME = "Keystone"
 APP_TAGLINE = "Project execution, in focus."
 
-SMTP_HOST = os.getenv("KEYSTONE_SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("KEYSTONE_SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("KEYSTONE_SMTP_USERNAME", "")
-SMTP_PASSWORD = os.getenv("KEYSTONE_SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("KEYSTONE_SMTP_FROM", SMTP_USERNAME or "keystone@localhost")
+GRAPH_TENANT_ID = os.getenv("KEYSTONE_GRAPH_TENANT_ID", "")
+GRAPH_CLIENT_ID = os.getenv("KEYSTONE_GRAPH_CLIENT_ID", "")
+GRAPH_CLIENT_SECRET = os.getenv("KEYSTONE_GRAPH_CLIENT_SECRET", "")
+GRAPH_SENDER = os.getenv("KEYSTONE_GRAPH_SENDER", "")
 APP_BASE_URL = os.getenv("KEYSTONE_APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)

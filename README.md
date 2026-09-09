@@ -31,20 +31,21 @@ Delete that file to start fresh.
 
 ### Assignment emails
 
-Task and project assignment emails are sent through the configured SMTP server.
-Set these environment variables on the host before starting Keystone:
+Task and project assignment emails are sent through Microsoft Graph using an
+Entra ID application registration. Grant the app the Microsoft Graph
+**Mail.Send** application permission, grant admin consent, and set these
+environment variables on the host before starting Keystone:
 
 ```bash
-export KEYSTONE_SMTP_HOST="smtp.example.com"
-export KEYSTONE_SMTP_PORT="587"
-export KEYSTONE_SMTP_USERNAME="keystone@example.com"
-export KEYSTONE_SMTP_PASSWORD="your-smtp-password"
-export KEYSTONE_SMTP_FROM="keystone@example.com"
+export KEYSTONE_GRAPH_TENANT_ID="your-tenant-id"
+export KEYSTONE_GRAPH_CLIENT_ID="your-client-id"
+export KEYSTONE_GRAPH_CLIENT_SECRET="your-client-secret"
+export KEYSTONE_GRAPH_SENDER="keystone@example.com"
 export KEYSTONE_APP_BASE_URL="https://keystone.example.com"
 ```
 
-TLS is enabled by default. Set `KEYSTONE_SMTP_USE_TLS=false` only when the SMTP
-server does not support STARTTLS. Restart the app after setting these values.
+The sender must be a mailbox the application is allowed to send as. Restart the
+app after setting these values.
 
 ### Demo logins (password is `keystone` for everyone)
 

@@ -1,38 +1,88 @@
 """Email notifications for Keystone events."""
 from __future__ import annotations
 
+import json
 import logging
-import os
-import smtplib
-from email.message import EmailMessage
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode
+from urllib.request import Request, urlopen
 
 from app.config import (
     APP_BASE_URL,
-    SMTP_FROM,
-    SMTP_HOST,
-    SMTP_PASSWORD,
-    SMTP_PORT,
-    SMTP_USERNAME,
+    GRAPH_CLIENT_ID,
+    GRAPH_CLIENT_SECRET,
+    GRAPH_SENDER,
+    GRAPH_TENANT_ID,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def _send_message(message: EmailMessage, recipient: str, kind: str) -> None:
-    if not SMTP_HOST:
-        logger.warning("%s email skipped: KEYSTONE_SMTP_HOST is not configured", kind)
+def _get_access_token() -> str:
+    token_url = f"https://login.microsoftonline.com/{quote(GRAPH_TENANT_ID, safe='')}/oauth2/v2.0/token"
+    request = Request(
+        token_url,
+        data=urlencode({
+            "client_id": GRAPH_CLIENT_ID,
+            "client_secret": GRAPH_CLIENT_SECRET,
+            "scope": "https://graph.microsoft.com/.default",
+            "grant_type": "client_credentials",
+        }).encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=15) as response:
+            payload = json.loads(response.read())
+    except HTTPError as exc:
+        raise RuntimeError(f"Microsoft Entra token request failed with HTTP {exc.code}") from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Microsoft Entra token request failed") from exc
+
+    token = payload.get("access_token")
+    if not token:
+        raise RuntimeError("Microsoft Entra token response did not contain an access token")
+    return token
+
+
+def _send_message(*, recipient: str, subject: str, body: str, kind: str) -> None:
+    missing = [
+        name for name, value in (
+            ("KEYSTONE_GRAPH_TENANT_ID", GRAPH_TENANT_ID),
+            ("KEYSTONE_GRAPH_CLIENT_ID", GRAPH_CLIENT_ID),
+            ("KEYSTONE_GRAPH_CLIENT_SECRET", GRAPH_CLIENT_SECRET),
+            ("KEYSTONE_GRAPH_SENDER", GRAPH_SENDER),
+        ) if not value
+    ]
+    if missing:
+        logger.warning("%s email skipped: missing %s", kind, ", ".join(missing))
         return
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
-            smtp.ehlo()
-            if os.getenv("KEYSTONE_SMTP_USE_TLS", "true").lower() not in {"0", "false", "no"}:
-                smtp.starttls()
-                smtp.ehlo()
-            if SMTP_USERNAME:
-                smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
-            smtp.send_message(message)
-    except Exception:
+        token = _get_access_token()
+        send_url = f"https://graph.microsoft.com/v1.0/users/{quote(GRAPH_SENDER, safe='')}/sendMail"
+        request = Request(
+            send_url,
+            data=json.dumps({
+                "message": {
+                    "subject": subject,
+                    "body": {"contentType": "Text", "content": body},
+                    "toRecipients": [{"emailAddress": {"address": recipient}}],
+                },
+                "saveToSentItems": True,
+            }).encode(),
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=15) as response:
+            if response.status != 202:
+                raise RuntimeError(f"Microsoft Graph sendMail returned HTTP {response.status}")
+    except HTTPError as exc:
+        logger.exception("Could not send %s email to %s: Graph returned HTTP %s", kind.lower(), recipient, exc.code)
+    except (URLError, TimeoutError, RuntimeError, json.JSONDecodeError):
         logger.exception("Could not send %s email to %s", kind.lower(), recipient)
 
 
@@ -45,20 +95,20 @@ def send_task_assignment_email(
     project_name: str,
     assigned_by: str,
 ) -> None:
-    """Send a task assignment email, skipping delivery when SMTP is not configured."""
+    """Send a task assignment email through Microsoft Graph."""
     task_url = f"{APP_BASE_URL}/tasks/{task_id}"
-    message = EmailMessage()
-    message["Subject"] = f"You have been assigned a task: {task_title}"
-    message["From"] = SMTP_FROM
-    message["To"] = recipient
-    message.set_content(
-        f"Hi {recipient_name},\n\n"
-        f"{assigned_by} assigned you the task \"{task_title}\" "
-        f"in the project \"{project_name}\".\n\n"
-        f"View the task: {task_url}\n\n"
-        "Keystone"
+    _send_message(
+        recipient=recipient,
+        subject=f"You have been assigned a task: {task_title}",
+        body=(
+            f"Hi {recipient_name},\n\n"
+            f"{assigned_by} assigned you the task \"{task_title}\" "
+            f"in the project \"{project_name}\".\n\n"
+            f"View the task: {task_url}\n\n"
+            "Keystone"
+        ),
+        kind="Task assignment",
     )
-    _send_message(message, recipient, "Task assignment")
 
 
 def send_project_assignment_email(
@@ -69,16 +119,16 @@ def send_project_assignment_email(
     project_name: str,
     assigned_by: str,
 ) -> None:
-    """Send a project assignment email, skipping delivery when SMTP is not configured."""
+    """Send a project assignment email through Microsoft Graph."""
     project_url = f"{APP_BASE_URL}/projects/{project_id}"
-    message = EmailMessage()
-    message["Subject"] = f"You have been assigned to a project: {project_name}"
-    message["From"] = SMTP_FROM
-    message["To"] = recipient
-    message.set_content(
-        f"Hi {recipient_name},\n\n"
-        f"{assigned_by} assigned you to the project \"{project_name}\".\n\n"
-        f"View the project: {project_url}\n\n"
-        "Keystone"
+    _send_message(
+        recipient=recipient,
+        subject=f"You have been assigned to a project: {project_name}",
+        body=(
+            f"Hi {recipient_name},\n\n"
+            f"{assigned_by} assigned you to the project \"{project_name}\".\n\n"
+            f"View the project: {project_url}\n\n"
+            "Keystone"
+        ),
+        kind="Project assignment",
     )
-    _send_message(message, recipient, "Project assignment")
