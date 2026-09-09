@@ -1,7 +1,7 @@
 """Deadline processing for monthly hours submissions."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -18,7 +18,12 @@ from app.hours import (
 from app.models import MonthlyHoursCycle, MonthlyHoursSubmission, User
 from app.notifications import send_consolidated_hours_email, send_hours_reminder_email
 
-SAST = ZoneInfo("Africa/Johannesburg")
+try:
+    SAST = ZoneInfo("Africa/Johannesburg")
+except Exception:
+    # South Africa observes UTC+2 year-round; this keeps Windows startup working
+    # until the tzdata dependency is installed.
+    SAST = timezone(timedelta(hours=2))
 
 
 def process_hours_deadline() -> None:
