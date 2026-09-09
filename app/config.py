@@ -28,8 +28,14 @@ APP_TAGLINE = "Project execution, in focus."
 GRAPH_TENANT_ID = os.getenv("KEYSTONE_GRAPH_TENANT_ID", "")
 GRAPH_CLIENT_ID = os.getenv("KEYSTONE_GRAPH_CLIENT_ID", "")
 GRAPH_CLIENT_SECRET = os.getenv("KEYSTONE_GRAPH_CLIENT_SECRET", "")
-GRAPH_SENDER = os.getenv("KEYSTONE_GRAPH_SENDER", "")
-HOURS_REPORT_RECIPIENT = os.getenv("KEYSTONE_HOURS_REPORT_RECIPIENT", "")
+GRAPH_SENDER = os.getenv(
+	"KEYSTONE_GRAPH_SENDER",
+	"keystonenotifications@professional.za.com",
+)
+HOURS_REPORT_RECIPIENT = os.getenv(
+	"KEYSTONE_HOURS_REPORT_RECIPIENT",
+	"taskeen@professional.za.com",
+)
 APP_BASE_URL = os.getenv("KEYSTONE_APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)

@@ -133,18 +133,16 @@ def send_hours_report_email(*, recipient: str, submitter_email: str,
                             submitter_name: str, month: str, entries: list[dict[str, str]],
                             workbook: bytes, filename: str) -> None:
     """Send a submitted monthly hours workbook through Microsoft Graph."""
-    entry_lines = "\n".join(
-        f"- {entry['customer']}: {entry['duration']} hours"
-        + (f" - {entry['description']}" if entry["description"] else "")
-        for entry in entries
-    )
+    cc = [] if submitter_email.lower() == recipient.lower() else [submitter_email]
     _send_message(
         recipient=recipient,
-        cc=[submitter_email],
-        subject=f"Monthly hours report - {month} - {submitter_name}",
+        cc=cc,
+        subject=f"{submitter_name}'s hours for {month}",
         body=(
-            f"{submitter_name} submitted their monthly hours for {month}.\n\n"
-            f"Entries:\n{entry_lines}\n"
+            f"Hello,\n\n"
+            f"IT Tech: {submitter_name}\n"
+            f"Please find attached the hours report for {month}.\n\n"
+            "The Excel file contains the complete monthly hours submission.\n\n"
         ),
         attachments=[(
             filename,

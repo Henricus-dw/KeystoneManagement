@@ -40,7 +40,7 @@ environment variables on the host before starting Keystone:
 export KEYSTONE_GRAPH_TENANT_ID="your-tenant-id"
 export KEYSTONE_GRAPH_CLIENT_ID="your-client-id"
 export KEYSTONE_GRAPH_CLIENT_SECRET="your-client-secret"
-export KEYSTONE_GRAPH_SENDER="keystone@example.com"
+export KEYSTONE_GRAPH_SENDER="keystonenotifications@professional.za.com"
 export KEYSTONE_HOURS_REPORT_RECIPIENT="hours@example.com"
 export KEYSTONE_APP_BASE_URL="https://keystone.example.com"
 ```
@@ -48,7 +48,8 @@ export KEYSTONE_APP_BASE_URL="https://keystone.example.com"
 The sender must be a mailbox the application is allowed to send as. Restart the
 app after setting these values. Monthly Hours Tracker submissions use
 `KEYSTONE_HOURS_REPORT_RECIPIENT` as the destination and CC the submitting team
-member automatically.
+member automatically. Until that variable is set, reports are temporarily sent
+to `taskeen@professional.za.com`.
 
 ### Demo logins (password is `keystone` for everyone)
 
