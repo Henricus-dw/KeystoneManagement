@@ -70,6 +70,7 @@
 	function toggleOtherCustomer() {
 		const isOther = customer.value === 'Other';
 		otherField.hidden = !isOther;
+		otherField.style.display = isOther ? 'block' : 'none';
 		otherInput.required = isOther;
 		if (!isOther) otherInput.value = '';
 	}
