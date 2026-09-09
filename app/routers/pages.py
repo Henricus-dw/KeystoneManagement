@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import secrets
+from io import BytesIO
 from datetime import date
 from pathlib import Path
 
@@ -9,9 +10,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, Up
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
 
 from app.changelog import CHANGELOG
-from app.config import PROJECT_UPLOADS_DIR
+from app.config import HOURS_REPORT_RECIPIENT, PROJECT_UPLOADS_DIR
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
 from app.reporting import build_activity_pdf
@@ -29,7 +32,7 @@ from app.models import (
     User,
     UserRole,
 )
-from app.notifications import send_project_assignment_email
+from app.notifications import send_hours_report_email, send_project_assignment_email
 from app.security import hash_password, verify_password
 from app.services import log_activity, recompute_health
 from app.templating import templates
@@ -652,6 +655,104 @@ def submit_progress(
         log_activity(db, user=user, verb="reported", summary="submitted a daily progress report")
     db.commit()
     return RedirectResponse("/progress", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Monthly hours tracker
+# ---------------------------------------------------------------------------
+def _hours_template(request: Request, user: User, customers: list[str], **values):
+    return templates.TemplateResponse(request, "hours_tracker.html", {
+        "user": user,
+        "nav": "hours",
+        "customers": customers,
+        "month_default": date.today().strftime("%Y-%m"),
+        **values,
+    })
+
+
+@router.get("/hours-tracker")
+def hours_tracker(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    customers = sorted({
+        client.strip() for client in db.scalars(select(Project.client))
+        if client and client.strip()
+    }, key=str.casefold)
+    return _hours_template(request, user, customers,
+                           submitted=request.query_params.get("submitted") == "1")
+
+
+@router.post("/hours-tracker")
+def submit_hours(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    customer: str = Form(...),
+    other_customer: str = Form(""),
+    duration: str = Form(...),
+    month: str = Form(...),
+    description: str = Form(""),
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    customers = sorted({
+        client.strip() for client in db.scalars(select(Project.client))
+        if client and client.strip()
+    }, key=str.casefold)
+    customer = customer.strip()
+    other_customer = other_customer.strip()
+    description = description.strip()
+    errors = []
+    if customer not in customers and customer != "Other":
+        errors.append("Select a customer from the list.")
+    if customer == "Other" and not other_customer:
+        errors.append("Enter the customer name when selecting Other.")
+    try:
+        hours = float(duration)
+        if hours <= 0 or hours > 744:
+            raise ValueError
+    except ValueError:
+        errors.append("Duration must be a number greater than 0 and no more than 744.")
+    try:
+        parsed_month = date.fromisoformat(f"{month}-01")
+    except ValueError:
+        parsed_month = None
+        errors.append("Select a valid month.")
+    if not HOURS_REPORT_RECIPIENT:
+        errors.append("Monthly hours reporting email is not configured yet.")
+    if errors:
+        return _hours_template(request, user, customers, error=" ".join(errors),
+                               values={"customer": customer, "other_customer": other_customer,
+                                       "duration": duration, "month": month,
+                                       "description": description})
+
+    customer_name = other_customer if customer == "Other" else customer
+    month_label = parsed_month.strftime("%B %Y")
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Monthly Hours"
+    headers = ["Internal customer", "Duration (hours)", "Month", "Description", "IT Tech"]
+    sheet.append(headers)
+    sheet.append([customer_name, hours, month_label, description, user.name])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="17324D")
+    for column, width in zip("ABCDE", (28, 18, 18, 55, 24)):
+        sheet.column_dimensions[column].width = width
+    sheet.freeze_panes = "A2"
+    output = BytesIO()
+    workbook.save(output)
+    filename = f"hours-{parsed_month.strftime('%Y-%m')}-{user.name.replace(' ', '-')}.xlsx"
+    background_tasks.add_task(
+        send_hours_report_email,
+        recipient=HOURS_REPORT_RECIPIENT,
+        submitter_email=user.email,
+        submitter_name=user.name,
+        month=month_label,
+        customer=customer_name,
+        duration=f"{hours:g}",
+        description=description,
+        workbook=output.getvalue(),
+        filename=filename,
+    )
+    return RedirectResponse("/hours-tracker?submitted=1", status_code=303)
 
 
 # ---------------------------------------------------------------------------

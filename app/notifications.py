@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from base64 import b64encode
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -45,7 +46,9 @@ def _get_access_token() -> str:
     return token
 
 
-def _send_message(*, recipient: str, subject: str, body: str, kind: str) -> None:
+def _send_message(*, recipient: str, subject: str, body: str, kind: str,
+                  cc: list[str] | None = None,
+                  attachments: list[tuple[str, bytes, str]] | None = None) -> None:
     missing = [
         name for name, value in (
             ("KEYSTONE_GRAPH_TENANT_ID", GRAPH_TENANT_ID),
@@ -61,14 +64,29 @@ def _send_message(*, recipient: str, subject: str, body: str, kind: str) -> None
     try:
         token = _get_access_token()
         send_url = f"https://graph.microsoft.com/v1.0/users/{quote(GRAPH_SENDER, safe='')}/sendMail"
+        message = {
+            "subject": subject,
+            "body": {"contentType": "Text", "content": body},
+            "toRecipients": [{"emailAddress": {"address": recipient}}],
+        }
+        if cc:
+            message["ccRecipients"] = [
+                {"emailAddress": {"address": address}} for address in cc
+            ]
+        if attachments:
+            message["attachments"] = [
+                {
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    "name": filename,
+                    "contentType": content_type,
+                    "contentBytes": b64encode(contents).decode("ascii"),
+                }
+                for filename, contents, content_type in attachments
+            ]
         request = Request(
             send_url,
             data=json.dumps({
-                "message": {
-                    "subject": subject,
-                    "body": {"contentType": "Text", "content": body},
-                    "toRecipients": [{"emailAddress": {"address": recipient}}],
-                },
+                "message": message,
                 "saveToSentItems": True,
             }).encode(),
             headers={
@@ -108,6 +126,30 @@ def send_task_assignment_email(
             "Keystone"
         ),
         kind="Task assignment",
+    )
+
+
+def send_hours_report_email(*, recipient: str, submitter_email: str,
+                            submitter_name: str, month: str, customer: str,
+                            duration: str, description: str,
+                            workbook: bytes, filename: str) -> None:
+    """Send a submitted monthly hours workbook through Microsoft Graph."""
+    _send_message(
+        recipient=recipient,
+        cc=[submitter_email],
+        subject=f"Monthly hours report - {month} - {submitter_name}",
+        body=(
+            f"{submitter_name} submitted their monthly hours for {month}.\n\n"
+            f"Customer: {customer}\n"
+            f"Duration: {duration} hours\n"
+            f"Description: {description or '—'}\n"
+        ),
+        attachments=[(
+            filename,
+            workbook,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )],
+        kind="Monthly hours",
     )
 
 
