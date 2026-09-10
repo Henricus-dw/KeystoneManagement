@@ -11,12 +11,15 @@ import holidays
 
 
 SAST = "Africa/Johannesburg"
-REQUIRED_MEMBER_EMAILS = {
-    "henri@professionkal.za.com",
-    "darryl@professional.aero",
-    "jean@professional.za.com",
-    "taskeen@professional.za.com",
-}
+REQUIRED_MEMBER_NAMES = {"henri", "darryl", "jean", "taskeen"}
+
+
+def member_key(user) -> str:
+    return user.name.strip().split()[0].casefold() if user.name.strip() else ""
+
+
+def is_required_member(user) -> bool:
+    return member_key(user) in REQUIRED_MEMBER_NAMES
 
 
 def south_african_holidays(year: int):

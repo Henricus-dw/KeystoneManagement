@@ -17,8 +17,10 @@ from app.config import HOURS_REPORT_RECIPIENT, HOURS_REPORTS_DIR, PROJECT_UPLOAD
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
 from app.hours import (
-    REQUIRED_MEMBER_EMAILS,
+    REQUIRED_MEMBER_NAMES,
     build_consolidated_workbook,
+    is_required_member,
+    member_key,
     previous_month,
     report_due_date,
     save_workbook,
@@ -706,8 +708,8 @@ def _ensure_hours_workbook(db: Session, report_month: date) -> MonthlyHoursCycle
     submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == report_month
     ).options(selectinload(MonthlyHoursSubmission.user))))
-    submitted_emails = {submission.user.email for submission in submissions}
-    if not REQUIRED_MEMBER_EMAILS.issubset(submitted_emails):
+    submitted_names = {member_key(submission.user) for submission in submissions}
+    if not REQUIRED_MEMBER_NAMES.issubset(submitted_names):
         return cycle
     if not cycle:
         cycle = MonthlyHoursCycle(report_month=report_month)
@@ -826,7 +828,6 @@ def submit_hours(
     submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == parsed_month
     ).options(selectinload(MonthlyHoursSubmission.user))))
-    submitted_emails = {submission.user.email for submission in submissions}
     _ensure_hours_workbook(db, parsed_month)
     return RedirectResponse(
         f"/hours-tracker?submitted=1&month={parsed_month:%Y-%m}",
@@ -936,8 +937,8 @@ def send_hours_review(
     path = _hours_cycle_path(cycle) if cycle else None
     if not path or cycle.consolidated_sent:
         return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
-    members = list(db.scalars(select(User).where(User.email.in_(REQUIRED_MEMBER_EMAILS))))
-    if len(members) != len(REQUIRED_MEMBER_EMAILS):
+    members = [member for member in db.scalars(select(User)) if is_required_member(member)]
+    if len(members) != len(REQUIRED_MEMBER_NAMES):
         return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
     background_tasks.add_task(
         send_consolidated_hours_email,

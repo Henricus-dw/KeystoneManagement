@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import HOURS_REPORT_RECIPIENT
 from app.db import SessionLocal
-from app.hours import REQUIRED_MEMBER_EMAILS, previous_month, report_due_date
+from app.hours import is_required_member, member_key, previous_month, report_due_date
 from app.models import MonthlyHoursCycle, MonthlyHoursSubmission, User
 from app.notifications import send_hours_reminder_email
 
@@ -39,10 +39,11 @@ def process_hours_deadline() -> None:
         submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
             MonthlyHoursSubmission.report_month == report_month
         ).options(selectinload(MonthlyHoursSubmission.user))))
-        submitted_emails = {submission.user.email for submission in submissions}
-        missing_users = list(db.scalars(select(User).where(
-            User.email.in_(REQUIRED_MEMBER_EMAILS - submitted_emails)
-        ).order_by(User.name)))
+        submitted_names = {member_key(submission.user) for submission in submissions}
+        missing_users = [
+            member for member in db.scalars(select(User).order_by(User.name))
+            if is_required_member(member) and member_key(member) not in submitted_names
+        ]
 
         if missing_users and not cycle.reminder_sent:
             send_hours_reminder_email(
