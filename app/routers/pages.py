@@ -19,6 +19,7 @@ from app.deps import require_admin, require_manager, require_user
 from app.hours import (
     REQUIRED_MEMBER_NAMES,
     build_consolidated_workbook,
+    current_reporting_month,
     is_required_member,
     member_key,
     previous_month,
@@ -732,11 +733,11 @@ def hours_tracker(
     db: Session = Depends(get_db),
 ):
     try:
-        report_month = date.fromisoformat(f"{month}-01") if month else previous_month(
+        report_month = date.fromisoformat(f"{month}-01") if month else current_reporting_month(
             datetime.now(ZoneInfo("Africa/Johannesburg")).date()
         )
     except ValueError:
-        report_month = previous_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
+        report_month = current_reporting_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
     cycle = _ensure_hours_workbook(db, report_month)
     month_submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == report_month
@@ -853,7 +854,7 @@ def hours_review(
     db: Session = Depends(get_db),
 ):
     try:
-        report_month = date.fromisoformat(f"{month}-01") if month else previous_month(date.today())
+        report_month = date.fromisoformat(f"{month}-01") if month else current_reporting_month(date.today())
     except ValueError:
         return RedirectResponse("/hours-tracker", status_code=303)
     cycle = _ensure_hours_workbook(db, report_month)

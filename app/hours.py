@@ -54,6 +54,11 @@ def previous_month(day: date) -> date:
     return (first - timedelta(days=1)).replace(day=1)
 
 
+def current_reporting_month(day: date) -> date:
+    """Use the current month from the 20th; otherwise keep the prior month open."""
+    return day.replace(day=1) if day.day >= 20 else previous_month(day)
+
+
 def build_consolidated_workbook(report_month: date, submissions) -> bytes:
     """Build one worksheet per submitted team member."""
     from openpyxl import Workbook

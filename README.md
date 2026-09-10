@@ -57,8 +57,9 @@ to `taskeen@professional.za.com`.
 ### Monthly hours workflow
 
 Hours are validated against 9 hours for each Monday-Friday working day in the
-selected month, excluding South African public holidays. The due date is the
-first working day of the following month. Each of Henri, Darryl, Jean, and
+selected month, excluding South African public holidays. The next month's
+tracker becomes available from the 20th of the preceding month. The due date
+is the first working day of the following month. Each of Henri, Darryl, Jean, and
 Taskeen submits once for the month; after all four submissions are received,
 Keystone sends one workbook with a separate worksheet per member. At 12:00
 SAST on the due date, missing members receive a reminder from the notification
