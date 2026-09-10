@@ -792,16 +792,6 @@ def submit_hours(
     except ValueError:
         parsed_month = None
         errors.append("Select a valid month.")
-    required_hours = working_hours(parsed_month) if parsed_month else 0
-    submitted_hours = sum(
-        float(entry["duration"]) for entry in entries
-        if entry["duration"] and entry["duration"].replace(".", "", 1).isdigit()
-    )
-    if parsed_month and abs(submitted_hours - required_hours) > 0.001:
-        errors.append(
-            f"Your submitted total is {submitted_hours:g} hours, but {parsed_month.strftime('%B %Y')} "
-            f"requires exactly {required_hours} working hours."
-        )
     if errors:
         return _hours_template(request, user, customers, error=" ".join(errors),
                                entries=entries, month=month,
@@ -812,7 +802,8 @@ def submit_hours(
         MonthlyHoursSubmission.user_id == user.id,
     ))
     if submission:
-        submission.entries = json.dumps(entries)
+        previous_entries = json.loads(submission.entries)
+        submission.entries = json.dumps(previous_entries + entries)
         submission.submitted_at = datetime.now(timezone.utc)
     else:
         submission = MonthlyHoursSubmission(
