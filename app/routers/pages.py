@@ -24,6 +24,7 @@ from app.hours import (
     previous_month,
     report_due_date,
     save_workbook,
+    update_member_workbook,
     update_workbook,
     workbook_sheets,
     working_hours,
@@ -814,11 +815,12 @@ def submit_hours(
         submission.entries = json.dumps(entries)
         submission.submitted_at = datetime.now(timezone.utc)
     else:
-        db.add(MonthlyHoursSubmission(
+        submission = MonthlyHoursSubmission(
             report_month=parsed_month,
             user_id=user.id,
             entries=json.dumps(entries),
-        ))
+        )
+        db.add(submission)
     cycle = db.get(MonthlyHoursCycle, parsed_month)
     if not cycle:
         cycle = MonthlyHoursCycle(report_month=parsed_month)
@@ -828,7 +830,13 @@ def submit_hours(
     submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == parsed_month
     ).options(selectinload(MonthlyHoursSubmission.user))))
-    _ensure_hours_workbook(db, parsed_month)
+    cycle = _ensure_hours_workbook(db, parsed_month)
+    path = _hours_cycle_path(cycle) if cycle else None
+    if path:
+        update_member_workbook(path, parsed_month, submission)
+        cycle.consolidated_sent = False
+        cycle.consolidated_sent_at = None
+        db.commit()
     return RedirectResponse(
         f"/hours-tracker?submitted=1&month={parsed_month:%Y-%m}",
         status_code=303,
@@ -896,8 +904,11 @@ def save_hours_review(
         return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
     cycle = db.get(MonthlyHoursCycle, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
-    if path and not cycle.consolidated_sent:
+    if path:
         update_workbook(path, sheets)
+        cycle.consolidated_sent = False
+        cycle.consolidated_sent_at = None
+        db.commit()
         return RedirectResponse(f"/hours-tracker/review?month={month}&saved=1", status_code=303)
     return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
 
@@ -916,9 +927,12 @@ def autosave_hours_review(
         return JSONResponse({"saved": False}, status_code=400)
     cycle = db.get(MonthlyHoursCycle, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
-    if not path or cycle.consolidated_sent:
+    if not path:
         return JSONResponse({"saved": False}, status_code=409)
     update_workbook(path, sheets)
+    cycle.consolidated_sent = False
+    cycle.consolidated_sent_at = None
+    db.commit()
     return JSONResponse({"saved": True})
 
 
@@ -935,7 +949,7 @@ def send_hours_review(
         return RedirectResponse("/hours-tracker", status_code=303)
     cycle = db.get(MonthlyHoursCycle, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
-    if not path or cycle.consolidated_sent:
+    if not path:
         return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
     members = [member for member in db.scalars(select(User)) if is_required_member(member)]
     if len(members) != len(REQUIRED_MEMBER_NAMES):

@@ -115,3 +115,33 @@ def update_workbook(path: Path, sheets: list[dict]) -> None:
             for column_index, value in enumerate(values, start=1):
                 sheet.cell(row=row_index, column=column_index).value = value
     workbook.save(path)
+
+
+def update_member_workbook(path: Path, report_month: date, submission) -> None:
+    """Replace only one member's worksheet after that member resubmits."""
+    from openpyxl import load_workbook
+    from openpyxl.styles import Font, PatternFill
+
+    workbook = load_workbook(path)
+    title = submission.user.name[:31]
+    if title in workbook.sheetnames:
+        del workbook[title]
+    sheet = workbook.create_sheet(title=title)
+    sheet.append(["Internal customer", "Duration (hours)", "Description", "Month", "Year", "IT Tech"])
+    for entry in json.loads(submission.entries):
+        customer = entry["other_customer"] if entry["customer"] == "Other" else entry["customer"]
+        sheet.append([
+            customer,
+            float(entry["duration"]),
+            entry["description"],
+            report_month.strftime("%B"),
+            report_month.year,
+            submission.user.name,
+        ])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="17324D")
+    for column, width in zip("ABCDEF", (28, 18, 55, 18, 12, 24)):
+        sheet.column_dimensions[column].width = width
+    sheet.freeze_panes = "A2"
+    workbook.save(path)
