@@ -738,15 +738,18 @@ def hours_tracker(
     except ValueError:
         report_month = previous_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
     cycle = _ensure_hours_workbook(db, report_month)
-    submitted_count = db.scalar(select(func.count(MonthlyHoursSubmission.id)).where(
+    month_submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == report_month
-    )) or 0
+    ).options(selectinload(MonthlyHoursSubmission.user))))
+    submitted_names = {member_key(submission.user) for submission in month_submissions}
+    submitted_count = len(submitted_names & REQUIRED_MEMBER_NAMES)
     return _hours_template(request, user, HOURS_CUSTOMERS,
                            entries=[{"customer": "", "other_customer": "", "duration": "", "description": ""}],
                            month=report_month.strftime("%Y-%m"),
                            **_hours_page_values(report_month),
                            review_available=bool(cycle and cycle.workbook_path),
                            submitted_count=submitted_count,
+                           all_members_submitted=REQUIRED_MEMBER_NAMES.issubset(submitted_names),
                            submitted=request.query_params.get("submitted") == "1")
 
 

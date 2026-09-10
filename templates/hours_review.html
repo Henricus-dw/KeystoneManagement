@@ -40,6 +40,7 @@
             {% for value in row %}
             {% if row_index == 0 %}<th>{{ value }}</th>{% else %}<td contenteditable="true">{{ value }}</td>{% endif %}
             {% endfor %}
+            {% if row_index == 0 %}<th aria-label="Actions"></th>{% else %}<td class="row-action"><button class="btn" type="button" data-delete-row title="Delete entry" aria-label="Delete entry"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3" /></svg></button></td>{% endif %}
           </tr>
           {% endfor %}
         </table>
@@ -78,6 +79,7 @@
       title: panel.dataset.sheetTitle,
       rows: Array.from(panel.querySelectorAll('tr')).map((row) =>
         Array.from(row.children).map((cell) => cell.textContent.trim())
+          .filter((value, index, cells) => index < cells.length - 1)
       )
     }));
   }
@@ -103,6 +105,21 @@
     table.addEventListener('input', () => {
       clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(autosave, 600);
+    });
+  });
+
+  document.querySelectorAll('[data-delete-row]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (window.confirm('Are you sure you want to delete this entry?')) {
+        button.closest('tr').remove();
+        manualSaveRequired = true;
+        if (sendButton) {
+          sendButton.disabled = false;
+          sendButton.textContent = 'Send consolidated workbook';
+        }
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(autosave, 600);
+      }
     });
   });
 

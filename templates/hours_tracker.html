@@ -15,7 +15,11 @@
 			<span class="dim">{{ required_hours }} standard hours, excluding weekends and South African public holidays. Submit by {{ due_date }} at 12:00 SAST. Additional entries can be submitted later.</span>
 		</div>
 		{% if submitted %}
+		{% if all_members_submitted %}
+		<div class="notice success">Your hours were saved. All 4 members have submitted their hours for {{ report_month_label }}. The consolidated workbook is available for review and submission.</div>
+		{% else %}
 		<div class="notice success">Your hours were saved. The consolidated team workbook will be available for review after all four team members submit.</div>
+		{% endif %}
 		{% endif %}
 		<div class="notice {{ 'success' if review_available else '' }}"><a href="/hours-tracker/review?month={{ month }}">{{ 'Review the consolidated ' ~ report_month_label ~ ' workbook' if review_available else 'Open team hours review' }}</a>{% if not review_available %}<br><span class="dim">{{ submitted_count }} of 4 members have submitted. The workbook will appear here after all four submit.</span>{% endif %}</div>
 		{% if error %}
@@ -28,7 +32,9 @@
 				<div class="hours-entry card" data-entry-row style="padding:14px;margin-bottom:12px">
 					<div class="between" style="margin-bottom:10px">
 						<b class="kicker">Work entry {{ loop.index }}</b>
-						<button class="btn" type="button" data-remove-entry>Remove</button>
+						<button class="btn" type="button" data-remove-entry title="Remove entry" aria-label="Remove entry">
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3" /></svg>
+						</button>
 					</div>
 					<label class="field">
 						<span>Internal customer *</span>
