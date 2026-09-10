@@ -56,7 +56,7 @@ to `taskeen@professional.za.com`.
 
 ### Monthly hours workflow
 
-Hours are validated against 8 hours for each Monday-Friday working day in the
+Hours are validated against 9 hours for each Monday-Friday working day in the
 selected month, excluding South African public holidays. The due date is the
 first working day of the following month. Each of Henri, Darryl, Jean, and
 Taskeen submits once for the month; after all four submissions are received,

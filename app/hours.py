@@ -41,7 +41,7 @@ def working_hours(report_month: date) -> int:
     total = 0
     for day_number in range(1, monthrange(report_month.year, report_month.month)[1] + 1):
         if is_working_day(date(report_month.year, report_month.month, day_number)):
-            total += 8
+            total += 9
     return total
 
 
