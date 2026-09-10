@@ -693,6 +693,11 @@ def _hours_page_values(report_month: date) -> dict:
     }
 
 
+def require_hours_reviewer(user: User = Depends(require_user)) -> User:
+    """Allow any signed-in team member to review and send team hours."""
+    return user
+
+
 @router.get("/hours-tracker")
 def hours_tracker(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     report_month = previous_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
@@ -810,7 +815,7 @@ def _hours_cycle_path(cycle: MonthlyHoursCycle) -> Path | None:
 def hours_review(
     request: Request,
     month: str = "",
-    user: User = Depends(require_manager),
+    user: User = Depends(require_hours_reviewer),
     db: Session = Depends(get_db),
 ):
     try:
@@ -849,7 +854,7 @@ def hours_review(
 def save_hours_review(
     month: str = Form(...),
     workbook_data: str = Form(...),
-    user: User = Depends(require_manager),
+    user: User = Depends(require_hours_reviewer),
     db: Session = Depends(get_db),
 ):
     try:
@@ -869,7 +874,7 @@ def save_hours_review(
 def autosave_hours_review(
     month: str = Form(...),
     workbook_data: str = Form(...),
-    user: User = Depends(require_manager),
+    user: User = Depends(require_hours_reviewer),
     db: Session = Depends(get_db),
 ):
     try:
@@ -889,7 +894,7 @@ def autosave_hours_review(
 def send_hours_review(
     background_tasks: BackgroundTasks,
     month: str = Form(...),
-    user: User = Depends(require_manager),
+    user: User = Depends(require_hours_reviewer),
     db: Session = Depends(get_db),
 ):
     try:
