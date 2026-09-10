@@ -732,12 +732,15 @@ def hours_tracker(
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    active_month = current_reporting_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
     try:
         report_month = date.fromisoformat(f"{month}-01") if month else current_reporting_month(
             datetime.now(ZoneInfo("Africa/Johannesburg")).date()
         )
     except ValueError:
-        report_month = current_reporting_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
+        report_month = active_month
+    if month and report_month < active_month:
+        return RedirectResponse(f"/hours-tracker?month={active_month:%Y-%m}", status_code=303)
     cycle = _ensure_hours_workbook(db, report_month)
     month_submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == report_month
@@ -853,10 +856,13 @@ def hours_review(
     user: User = Depends(require_hours_reviewer),
     db: Session = Depends(get_db),
 ):
+    active_month = current_reporting_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
     try:
-        report_month = date.fromisoformat(f"{month}-01") if month else current_reporting_month(date.today())
+        report_month = date.fromisoformat(f"{month}-01") if month else active_month
     except ValueError:
         return RedirectResponse("/hours-tracker", status_code=303)
+    if month and report_month < active_month:
+        return RedirectResponse(f"/hours-tracker/review?month={active_month:%Y-%m}", status_code=303)
     cycle = _ensure_hours_workbook(db, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
     if not path:
