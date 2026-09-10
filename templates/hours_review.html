@@ -52,7 +52,9 @@
   </form>
   <form method="post" action="/hours-tracker/review/send" id="send-workbook-form" style="margin-top:10px">
     <input type="hidden" name="month" value="{{ month }}" />
-    <button class="btn primary" type="submit">Send consolidated workbook</button>
+    <button class="btn primary" type="submit" {{ 'disabled' if sent else '' }}>
+      {{ 'Workbook already sent - edit a worksheet to resend' if sent else 'Send consolidated workbook' }}
+    </button>
   </form>
   {% endif %}
 </div>
@@ -64,6 +66,7 @@
   const panels = document.querySelectorAll('.sheet-panel');
   const saveForm = document.getElementById('save-workbook-form');
   const workbookData = document.getElementById('workbook-data');
+  let manualSaveRequired = false;
 
   tabs.forEach((tab) => tab.addEventListener('click', () => {
     tabs.forEach((item) => item.classList.toggle('primary', item === tab));
@@ -105,16 +108,33 @@
 
   if (saveForm) {
     saveForm.addEventListener('submit', () => {
+      manualSaveRequired = false;
       workbookData.value = JSON.stringify(collectWorkbook());
     });
   }
   const sendForm = document.getElementById('send-workbook-form');
+  const sendButton = sendForm?.querySelector('button[type="submit"]');
   if (sendForm) {
     sendForm.addEventListener('submit', (event) => {
+      if (manualSaveRequired) {
+        event.preventDefault();
+        window.alert('Please save workbook changes first');
+        return;
+      }
       if (!window.confirm('Are you sure the workbook is ready to be sent?')) {
         event.preventDefault();
       }
     });
   }
+
+  document.querySelectorAll('.review-table').forEach((table) => {
+    table.addEventListener('input', () => {
+      manualSaveRequired = true;
+      if (sendButton) {
+        sendButton.disabled = false;
+        sendButton.textContent = 'Send consolidated workbook';
+      }
+    });
+  });
 </script>
 {% endblock %}

@@ -949,7 +949,7 @@ def send_hours_review(
         return RedirectResponse("/hours-tracker", status_code=303)
     cycle = db.get(MonthlyHoursCycle, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
-    if not path:
+    if not path or cycle.consolidated_sent:
         return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
     members = [member for member in db.scalars(select(User)) if is_required_member(member)]
     if len(members) != len(REQUIRED_MEMBER_NAMES):
