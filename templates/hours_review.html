@@ -10,12 +10,16 @@
       <div class="kicker">Consolidated workbook</div>
       <h3>{{ month_label }}</h3>
     </div>
-    <span class="badge">{{ 'Sent' if sent else 'Ready for review' }}</span>
+    <span class="badge">{{ 'Sent' if sent else ('Waiting for submissions' if waiting else 'Ready for review') }}</span>
   </div>
   {% if saved %}<div class="notice success">Workbook changes saved on the server.</div>{% endif %}
   {% if sent_now %}<div class="notice success">The consolidated workbook was sent to the recipient and CC'd to all four team members.</div>{% endif %}
   <p class="dim" style="line-height:1.6">Review each member's worksheet below. Click a cell to edit it; changes are saved to the server automatically. Send the saved workbook when it is ready.</p>
   <div id="autosave-status" class="dim" style="font-size:12px;margin-bottom:12px">All changes saved</div>
+
+  {% if waiting %}
+  <div class="notice">The consolidated workbook is not ready yet. {{ submitted_count }} of 4 team members have submitted their hours. This page will show the member worksheets once all four submissions are complete.</div>
+  {% else %}
 
   <div class="tabs" role="tablist">
     {% for sheet in sheets %}
@@ -53,6 +57,7 @@
     <input type="hidden" name="month" value="{{ month }}" />
     <button class="btn primary" type="submit">Send consolidated workbook</button>
   </form>
+  {% endif %}
   {% endif %}
 </div>
 {% endblock %}
@@ -102,8 +107,10 @@
     });
   });
 
-  saveForm.addEventListener('submit', () => {
-    workbookData.value = JSON.stringify(collectWorkbook());
-  });
+  if (saveForm) {
+    saveForm.addEventListener('submit', () => {
+      workbookData.value = JSON.stringify(collectWorkbook());
+    });
+  }
 </script>
 {% endblock %}

@@ -697,11 +697,15 @@ def _hours_page_values(report_month: date) -> dict:
 def hours_tracker(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     report_month = previous_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
     cycle = db.get(MonthlyHoursCycle, report_month)
+    submitted_count = db.scalar(select(func.count(MonthlyHoursSubmission.id)).where(
+        MonthlyHoursSubmission.report_month == report_month
+    )) or 0
     return _hours_template(request, user, HOURS_CUSTOMERS,
                            entries=[{"customer": "", "other_customer": "", "duration": "", "description": ""}],
                            month=report_month.strftime("%Y-%m"),
                            **_hours_page_values(report_month),
                            review_available=bool(cycle and cycle.workbook_path),
+                           submitted_count=submitted_count,
                            submitted=request.query_params.get("submitted") == "1")
 
 
@@ -816,7 +820,19 @@ def hours_review(
     cycle = db.get(MonthlyHoursCycle, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
     if not path:
-        return RedirectResponse("/hours-tracker?review=missing", status_code=303)
+        submitted_count = db.scalar(select(func.count(MonthlyHoursSubmission.id)).where(
+            MonthlyHoursSubmission.report_month == report_month
+        )) or 0
+        return templates.TemplateResponse(request, "hours_review.html", {
+            "user": user,
+            "nav": "hours",
+            "month": report_month.strftime("%Y-%m"),
+            "month_label": report_month.strftime("%B %Y"),
+            "sheets": [],
+            "sent": False,
+            "waiting": True,
+            "submitted_count": submitted_count,
+        })
     return templates.TemplateResponse(request, "hours_review.html", {
         "user": user,
         "nav": "hours",

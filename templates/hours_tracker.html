@@ -17,8 +17,8 @@
 		{% if submitted %}
 		<div class="notice success">Your hours were saved. The consolidated team workbook will be available for review after all four team members submit.</div>
 		{% endif %}
-		{% if review_available and user.role.value in ['Admin', 'Manager'] %}
-		<div class="notice success"><a href="/hours-tracker/review?month={{ month }}">Review the consolidated {{ report_month_label }} workbook</a></div>
+		{% if user.role.value in ['Admin', 'Manager'] %}
+		<div class="notice {{ 'success' if review_available else '' }}"><a href="/hours-tracker/review?month={{ month }}">{{ 'Review the consolidated ' ~ report_month_label ~ ' workbook' if review_available else 'Open team hours review' }}</a>{% if not review_available %}<br><span class="dim">{{ submitted_count }} of 4 members have submitted. The workbook will appear here after all four submit.</span>{% endif %}</div>
 		{% endif %}
 		{% if error %}
 		<div class="notice danger" id="hours-error" data-error="{{ error }}">{{ error }}</div>
