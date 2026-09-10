@@ -9,14 +9,9 @@ from sqlalchemy.orm import selectinload
 
 from app.config import HOURS_REPORT_RECIPIENT
 from app.db import SessionLocal
-from app.hours import (
-    REQUIRED_MEMBER_EMAILS,
-    build_consolidated_workbook,
-    previous_month,
-    report_due_date,
-)
+from app.hours import REQUIRED_MEMBER_EMAILS, previous_month, report_due_date
 from app.models import MonthlyHoursCycle, MonthlyHoursSubmission, User
-from app.notifications import send_consolidated_hours_email, send_hours_reminder_email
+from app.notifications import send_hours_reminder_email
 
 try:
     SAST = ZoneInfo("Africa/Johannesburg")
@@ -49,18 +44,7 @@ def process_hours_deadline() -> None:
             User.email.in_(REQUIRED_MEMBER_EMAILS - submitted_emails)
         ).order_by(User.name)))
 
-        if not missing_users and not cycle.consolidated_sent:
-            workbook = build_consolidated_workbook(report_month, submissions)
-            send_consolidated_hours_email(
-                recipient=HOURS_REPORT_RECIPIENT,
-                month=report_month.strftime("%B %Y"),
-                workbook=workbook,
-                filename=f"team-hours-{report_month.strftime('%Y-%m')}.xlsx",
-            )
-            cycle.consolidated_sent = True
-            cycle.consolidated_sent_at = datetime.now(timezone.utc)
-            db.commit()
-        elif missing_users and not cycle.reminder_sent:
+        if missing_users and not cycle.reminder_sent:
             send_hours_reminder_email(
                 recipients=[member.email for member in missing_users],
                 missing_members=[member.name for member in missing_users],

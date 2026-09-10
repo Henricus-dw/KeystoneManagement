@@ -62,6 +62,12 @@ def _migrate() -> None:
                 conn.exec_driver_sql(
                     "ALTER TABLE servers ADD COLUMN image VARCHAR(300) NOT NULL DEFAULT ''")
 
+        if "monthly_hours_cycles" in tables:
+            hcols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(monthly_hours_cycles)")]
+            if "workbook_path" not in hcols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE monthly_hours_cycles ADD COLUMN workbook_path VARCHAR(500)")
+
 
 def seed() -> None:
     init_db()

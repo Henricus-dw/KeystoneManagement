@@ -5,6 +5,7 @@ from calendar import monthrange
 from datetime import date, timedelta
 from io import BytesIO
 import json
+from pathlib import Path
 
 import holidays
 
@@ -80,3 +81,34 @@ def build_consolidated_workbook(report_month: date, submissions) -> bytes:
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
+
+
+def save_workbook(path: Path, workbook: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(workbook)
+
+
+def workbook_sheets(path: Path) -> list[dict]:
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(path, data_only=False)
+    sheets = []
+    for sheet in workbook.worksheets:
+        sheets.append({
+            "title": sheet.title,
+            "rows": [[cell.value if cell.value is not None else "" for cell in row]
+                     for row in sheet.iter_rows()],
+        })
+    return sheets
+
+
+def update_workbook(path: Path, sheets: list[dict]) -> None:
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(path)
+    for sheet_data in sheets:
+        sheet = workbook[sheet_data["title"]]
+        for row_index, values in enumerate(sheet_data["rows"], start=1):
+            for column_index, value in enumerate(values, start=1):
+                sheet.cell(row=row_index, column=column_index).value = value
+    workbook.save(path)

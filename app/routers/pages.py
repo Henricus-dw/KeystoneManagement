@@ -8,12 +8,12 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.changelog import CHANGELOG
-from app.config import HOURS_REPORT_RECIPIENT, PROJECT_UPLOADS_DIR
+from app.config import HOURS_REPORT_RECIPIENT, HOURS_REPORTS_DIR, PROJECT_UPLOADS_DIR
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
 from app.hours import (
@@ -21,6 +21,9 @@ from app.hours import (
     build_consolidated_workbook,
     previous_month,
     report_due_date,
+    save_workbook,
+    update_workbook,
+    workbook_sheets,
     working_hours,
 )
 from app.reporting import build_activity_pdf
@@ -693,10 +696,12 @@ def _hours_page_values(report_month: date) -> dict:
 @router.get("/hours-tracker")
 def hours_tracker(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     report_month = previous_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
+    cycle = db.get(MonthlyHoursCycle, report_month)
     return _hours_template(request, user, HOURS_CUSTOMERS,
                            entries=[{"customer": "", "other_customer": "", "duration": "", "description": ""}],
                            month=report_month.strftime("%Y-%m"),
                            **_hours_page_values(report_month),
+                           review_available=bool(cycle and cycle.workbook_path),
                            submitted=request.query_params.get("submitted") == "1")
 
 
@@ -780,19 +785,120 @@ def submit_hours(
         MonthlyHoursSubmission.report_month == parsed_month
     ).options(selectinload(MonthlyHoursSubmission.user))))
     submitted_emails = {submission.user.email for submission in submissions}
-    if not cycle.consolidated_sent and REQUIRED_MEMBER_EMAILS.issubset(submitted_emails):
+    if not cycle.consolidated_sent and not cycle.workbook_path and REQUIRED_MEMBER_EMAILS.issubset(submitted_emails):
         workbook = build_consolidated_workbook(parsed_month, submissions)
-        background_tasks.add_task(
-            send_consolidated_hours_email,
-            recipient=HOURS_REPORT_RECIPIENT,
-            month=parsed_month.strftime("%B %Y"),
-            workbook=workbook,
-            filename=f"team-hours-{parsed_month.strftime('%Y-%m')}.xlsx",
-        )
-        cycle.consolidated_sent = True
-        cycle.consolidated_sent_at = datetime.now(timezone.utc)
+        workbook_path = HOURS_REPORTS_DIR / f"team-hours-{parsed_month.strftime('%Y-%m')}.xlsx"
+        save_workbook(workbook_path, workbook)
+        cycle.workbook_path = str(workbook_path)
         db.commit()
     return RedirectResponse("/hours-tracker?submitted=1", status_code=303)
+
+
+def _hours_cycle_path(cycle: MonthlyHoursCycle) -> Path | None:
+    if not cycle.workbook_path:
+        return None
+    base = HOURS_REPORTS_DIR.resolve()
+    path = Path(cycle.workbook_path).resolve()
+    return path if base in path.parents and path.is_file() else None
+
+
+@router.get("/hours-tracker/review")
+def hours_review(
+    request: Request,
+    month: str = "",
+    user: User = Depends(require_manager),
+    db: Session = Depends(get_db),
+):
+    try:
+        report_month = date.fromisoformat(f"{month}-01") if month else previous_month(date.today())
+    except ValueError:
+        return RedirectResponse("/hours-tracker", status_code=303)
+    cycle = db.get(MonthlyHoursCycle, report_month)
+    path = _hours_cycle_path(cycle) if cycle else None
+    if not path:
+        return RedirectResponse("/hours-tracker?review=missing", status_code=303)
+    return templates.TemplateResponse(request, "hours_review.html", {
+        "user": user,
+        "nav": "hours",
+        "month": report_month.strftime("%Y-%m"),
+        "month_label": report_month.strftime("%B %Y"),
+        "sheets": workbook_sheets(path),
+        "sent": cycle.consolidated_sent,
+        "saved": request.query_params.get("saved") == "1",
+        "sent_now": request.query_params.get("sent") == "1",
+    })
+
+
+@router.post("/hours-tracker/review/save")
+def save_hours_review(
+    month: str = Form(...),
+    workbook_data: str = Form(...),
+    user: User = Depends(require_manager),
+    db: Session = Depends(get_db),
+):
+    try:
+        report_month = date.fromisoformat(f"{month}-01")
+        sheets = json.loads(workbook_data)
+    except (ValueError, json.JSONDecodeError):
+        return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
+    cycle = db.get(MonthlyHoursCycle, report_month)
+    path = _hours_cycle_path(cycle) if cycle else None
+    if path and not cycle.consolidated_sent:
+        update_workbook(path, sheets)
+        return RedirectResponse(f"/hours-tracker/review?month={month}&saved=1", status_code=303)
+    return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
+
+
+@router.post("/hours-tracker/review/autosave")
+def autosave_hours_review(
+    month: str = Form(...),
+    workbook_data: str = Form(...),
+    user: User = Depends(require_manager),
+    db: Session = Depends(get_db),
+):
+    try:
+        report_month = date.fromisoformat(f"{month}-01")
+        sheets = json.loads(workbook_data)
+    except (ValueError, json.JSONDecodeError):
+        return JSONResponse({"saved": False}, status_code=400)
+    cycle = db.get(MonthlyHoursCycle, report_month)
+    path = _hours_cycle_path(cycle) if cycle else None
+    if not path or cycle.consolidated_sent:
+        return JSONResponse({"saved": False}, status_code=409)
+    update_workbook(path, sheets)
+    return JSONResponse({"saved": True})
+
+
+@router.post("/hours-tracker/review/send")
+def send_hours_review(
+    background_tasks: BackgroundTasks,
+    month: str = Form(...),
+    user: User = Depends(require_manager),
+    db: Session = Depends(get_db),
+):
+    try:
+        report_month = date.fromisoformat(f"{month}-01")
+    except ValueError:
+        return RedirectResponse("/hours-tracker", status_code=303)
+    cycle = db.get(MonthlyHoursCycle, report_month)
+    path = _hours_cycle_path(cycle) if cycle else None
+    if not path or cycle.consolidated_sent:
+        return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
+    members = list(db.scalars(select(User).where(User.email.in_(REQUIRED_MEMBER_EMAILS))))
+    if len(members) != len(REQUIRED_MEMBER_EMAILS):
+        return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
+    background_tasks.add_task(
+        send_consolidated_hours_email,
+        recipient=HOURS_REPORT_RECIPIENT,
+        month=report_month.strftime("%B %Y"),
+        workbook=path.read_bytes(),
+        filename=path.name,
+        cc=sorted(member.email for member in members),
+    )
+    cycle.consolidated_sent = True
+    cycle.consolidated_sent_at = datetime.now(timezone.utc)
+    db.commit()
+    return RedirectResponse(f"/hours-tracker/review?month={month}&sent=1", status_code=303)
 
 
 # ---------------------------------------------------------------------------

@@ -289,6 +289,7 @@ class MonthlyHoursCycle(Base):
     consolidated_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     consolidated_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    workbook_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class Activity(Base):

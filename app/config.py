@@ -13,6 +13,7 @@ UPLOADS_DIR = STATIC_DIR / "uploads"
 DATA_DIR = BASE_DIR / "data"
 SERVER_IMAGES_DIR = DATA_DIR / "server_images"
 PROJECT_UPLOADS_DIR = DATA_DIR / "project_uploads"
+HOURS_REPORTS_DIR = DATA_DIR / "hours_reports"
 DB_PATH = BASE_DIR / "keystone.db"
 
 DATABASE_URL = f"sqlite:///{DB_PATH}"
@@ -44,3 +45,4 @@ APP_BASE_URL = os.getenv(
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 SERVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 PROJECT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+HOURS_REPORTS_DIR.mkdir(parents=True, exist_ok=True)

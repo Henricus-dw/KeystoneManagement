@@ -154,10 +154,12 @@ def send_hours_report_email(*, recipient: str, submitter_email: str,
 
 
 def send_consolidated_hours_email(*, recipient: str, month: str,
-                                  workbook: bytes, filename: str) -> None:
+                                  workbook: bytes, filename: str,
+                                  cc: list[str] | None = None) -> None:
     """Send the four-member consolidated monthly workbook."""
     _send_message(
         recipient=recipient,
+        cc=cc,
         subject=f"Team hours for {month}",
         body=(
             "Hello,\n\n"
