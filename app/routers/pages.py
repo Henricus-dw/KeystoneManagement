@@ -717,7 +717,7 @@ def _ensure_hours_workbook(db: Session, report_month: date) -> MonthlyHoursCycle
         db.add(cycle)
         db.flush()
     workbook = build_consolidated_workbook(report_month, submissions)
-    workbook_path = HOURS_REPORTS_DIR / f"team-hours-{report_month:%Y-%m}.xlsx"
+    workbook_path = HOURS_REPORTS_DIR / f"IT_team-hours-{report_month:%Y-%m}.xlsx"
     save_workbook(workbook_path, workbook)
     cycle.workbook_path = str(workbook_path)
     db.commit()

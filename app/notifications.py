@@ -163,8 +163,7 @@ def send_consolidated_hours_email(*, recipient: str, month: str,
         subject=f"Team hours for {month}",
         body=(
             "Hello,\n\n"
-            f"Please find attached the consolidated team hours report for {month}.\n\n"
-            "The Excel file contains a separate worksheet for each team member."
+            f"Please find attached the consolidated team hours report for Darryl, Jean, Henri, and Taskeen for {month}."
         ),
         attachments=[(
             filename,
