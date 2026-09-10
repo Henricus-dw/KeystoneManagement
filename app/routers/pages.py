@@ -698,10 +698,43 @@ def require_hours_reviewer(user: User = Depends(require_user)) -> User:
     return user
 
 
-@router.get("/hours-tracker")
-def hours_tracker(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
-    report_month = previous_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
+def _ensure_hours_workbook(db: Session, report_month: date) -> MonthlyHoursCycle | None:
+    """Create the review workbook when all four saved submissions are present."""
     cycle = db.get(MonthlyHoursCycle, report_month)
+    if cycle and cycle.workbook_path and Path(cycle.workbook_path).is_file():
+        return cycle
+    submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
+        MonthlyHoursSubmission.report_month == report_month
+    ).options(selectinload(MonthlyHoursSubmission.user))))
+    submitted_emails = {submission.user.email for submission in submissions}
+    if not REQUIRED_MEMBER_EMAILS.issubset(submitted_emails):
+        return cycle
+    if not cycle:
+        cycle = MonthlyHoursCycle(report_month=report_month)
+        db.add(cycle)
+        db.flush()
+    workbook = build_consolidated_workbook(report_month, submissions)
+    workbook_path = HOURS_REPORTS_DIR / f"team-hours-{report_month:%Y-%m}.xlsx"
+    save_workbook(workbook_path, workbook)
+    cycle.workbook_path = str(workbook_path)
+    db.commit()
+    return cycle
+
+
+@router.get("/hours-tracker")
+def hours_tracker(
+    request: Request,
+    month: str = "",
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        report_month = date.fromisoformat(f"{month}-01") if month else previous_month(
+            datetime.now(ZoneInfo("Africa/Johannesburg")).date()
+        )
+    except ValueError:
+        report_month = previous_month(datetime.now(ZoneInfo("Africa/Johannesburg")).date())
+    cycle = _ensure_hours_workbook(db, report_month)
     submitted_count = db.scalar(select(func.count(MonthlyHoursSubmission.id)).where(
         MonthlyHoursSubmission.report_month == report_month
     )) or 0
@@ -794,13 +827,11 @@ def submit_hours(
         MonthlyHoursSubmission.report_month == parsed_month
     ).options(selectinload(MonthlyHoursSubmission.user))))
     submitted_emails = {submission.user.email for submission in submissions}
-    if not cycle.consolidated_sent and not cycle.workbook_path and REQUIRED_MEMBER_EMAILS.issubset(submitted_emails):
-        workbook = build_consolidated_workbook(parsed_month, submissions)
-        workbook_path = HOURS_REPORTS_DIR / f"team-hours-{parsed_month.strftime('%Y-%m')}.xlsx"
-        save_workbook(workbook_path, workbook)
-        cycle.workbook_path = str(workbook_path)
-        db.commit()
-    return RedirectResponse("/hours-tracker?submitted=1", status_code=303)
+    _ensure_hours_workbook(db, parsed_month)
+    return RedirectResponse(
+        f"/hours-tracker?submitted=1&month={parsed_month:%Y-%m}",
+        status_code=303,
+    )
 
 
 def _hours_cycle_path(cycle: MonthlyHoursCycle) -> Path | None:
@@ -822,7 +853,7 @@ def hours_review(
         report_month = date.fromisoformat(f"{month}-01") if month else previous_month(date.today())
     except ValueError:
         return RedirectResponse("/hours-tracker", status_code=303)
-    cycle = db.get(MonthlyHoursCycle, report_month)
+    cycle = _ensure_hours_workbook(db, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
     if not path:
         submitted_count = db.scalar(select(func.count(MonthlyHoursSubmission.id)).where(
