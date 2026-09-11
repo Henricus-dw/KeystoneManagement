@@ -792,12 +792,36 @@ h4 {
 }
 
 .col-body {
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-height: 40px;
   flex: 1;
+  /* A busy column scrolls inside itself instead of stretching the whole page,
+     so the board stays roughly one screen tall however many tasks there are. */
+  max-height: min(62vh, 720px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.col-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.col-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.col-body::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
+}
+
+.col-body::-webkit-scrollbar-thumb:hover {
+  background: var(--dim);
 }
 
 .col-body.drag-over {
@@ -807,11 +831,13 @@ h4 {
   border-radius: 10px;
 }
 
+/* Cards are deliberately dense: metadata shares one row with the code, so a
+   task costs ~2 lines instead of 3 and roughly twice as many fit on screen. */
 .kcard {
   background: linear-gradient(180deg, var(--surface), var(--surface-2));
   border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 12px;
+  border-radius: 9px;
+  padding: 8px 10px;
   cursor: grab;
   transition: .12s;
   position: relative;
@@ -835,19 +861,57 @@ h4 {
 }
 
 .kcard .ktitle {
-  font-size: 13.5px;
+  font-size: 12.5px;
   font-weight: 500;
-  margin: 5px 0 10px;
-  line-height: 1.35;
+  margin: 3px 0 0;
+  line-height: 1.3;
 }
 
-.kcard .kfoot {
+/* Code · priority ---- due · assignees, all on one line. */
+.kcard .kmeta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  min-height: 18px;
 }
 
+.kcard .kspacer {
+  flex: 1 1 auto;
+}
+
+.kcard .kdue {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.kcard .badge {
+  font-size: 9px;
+  letter-spacing: .08em;
+  padding: 1px 6px;
+  gap: 4px;
+}
+
+.kcard .badge::before {
+  width: 5px;
+  height: 5px;
+}
+
+.kcard .avatar-stack .avatar {
+  width: 18px;
+  height: 18px;
+  font-size: 8.5px;
+  border-radius: 5px;
+  margin-left: -5px;
+}
+
+.kcard .avatar-stack .avatar:first-child {
+  margin-left: 0;
+}
+
+/* Sits between the column header and the (scrolling) card list, so it stays
+   reachable no matter how long the column gets. */
 .add-card {
   font-family: var(--mono);
   font-size: 11px;
@@ -857,8 +921,8 @@ h4 {
   background: transparent;
   border: 1px dashed var(--line);
   border-radius: 9px;
-  padding: 9px;
-  width: 100%;
+  padding: 7px;
+  margin: 10px 10px 0;
   transition: .15s;
 }
 

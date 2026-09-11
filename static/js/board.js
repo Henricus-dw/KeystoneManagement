@@ -39,9 +39,8 @@
       e.preventDefault();
       body.classList.add("drag-over");
       const after = afterElement(body, e.clientY);
-      const addBtn = body.querySelector(".add-card");
       if (!dragged) return;
-      if (after == null) body.insertBefore(dragged, addBtn);
+      if (after == null) body.appendChild(dragged);
       else body.insertBefore(dragged, after);
     });
     body.addEventListener("dragleave", (e) => {
@@ -86,11 +85,11 @@
   const elDue = document.getElementById("ntDue");
   const elAssignees = document.getElementById("ntAssignees");
   let pendingStatus = "Todo";
-  let pendingBtn = null;
+  let pendingBody = null;
 
-  function openModal(status, addBtn) {
+  function openModal(status, body) {
     pendingStatus = status;
-    pendingBtn = addBtn;
+    pendingBody = body;
     elColumn.textContent = status;
     elTitle.value = "";
     elDue.value = "";
@@ -102,11 +101,12 @@
     modal.hidden = false;
     setTimeout(() => elTitle.focus(), 30);
   }
-  function closeModal() { modal.hidden = true; pendingBtn = null; }
+  function closeModal() { modal.hidden = true; pendingBody = null; }
 
   board.addEventListener("click", (e) => {
     const btn = e.target.closest(".add-card");
-    if (btn) openModal(btn.dataset.add, btn);
+    // The add button now sits above the card list, so reach across to its column body.
+    if (btn) openModal(btn.dataset.add, btn.closest(".col").querySelector(".col-body"));
   });
 
   if (modal) {
@@ -136,13 +136,13 @@
     });
     const data = await res.json();
     if (data.ok) {
-      buildCard(pendingBtn, data.task);
+      buildCard(pendingBody, data.task);
       updateProgress(data.progress);
       closeModal();
     }
   }
 
-  function buildCard(addBtn, task) {
+  function buildCard(body, task) {
     const card = document.createElement("a");
     card.className = "kcard";
     card.href = `/tasks/${task.id}`;
@@ -154,13 +154,15 @@
     const avatars = (task.assignees || []).slice(0, 3).map((a) =>
       `<div class="avatar sm" style="background:${a.accent}" title="${escapeHtml(a.name)}">${escapeHtml(a.initials)}</div>`
     ).join("");
-    const due = task.due ? `<span class="dim mono" style="font-size:10.5px">${escapeHtml(task.due)}</span>` : "";
+    const due = task.due ? `<span class="kdue">${escapeHtml(task.due)}</span>` : "";
 
     card.innerHTML =
-      `<div class="between"><span class="code">${task.code}</span>${prio}</div>` +
-      `<div class="ktitle">${escapeHtml(task.title)}</div>` +
-      `<div class="kfoot"><div class="avatar-stack">${avatars}</div>${due}</div>`;
-    addBtn.parentNode.insertBefore(card, addBtn);
+      `<div class="kmeta"><span class="code">${task.code}</span>${prio}` +
+      `<span class="kspacer"></span>${due}<div class="avatar-stack">${avatars}</div></div>` +
+      `<div class="ktitle">${escapeHtml(task.title)}</div>`;
+    // New tasks sort to the top of their column server-side, so mirror that here.
+    body.insertBefore(card, body.firstChild);
+    body.scrollTop = 0;
     recount();
   }
 

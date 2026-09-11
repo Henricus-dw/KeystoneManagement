@@ -51,23 +51,25 @@
 
 <div class="section-title"><h2>Board</h2><div class="line"></div>
   <span class="dim mono" style="font-size:11px">live snapshot</span></div>
-<div class="board">
+<div class="board" id="projectBoard">
   {% for status in TASK_COLUMNS %}
   <div class="col">
     <div class="col-h k-{{ status|slug }}">
       <span class="dot"></span><span class="t">{{ status.value }}</span>
       <span class="count">{{ columns[status]|length }}</span>
     </div>
+    {% if can_add %}<button class="add-card" data-add="{{ status.value }}">+ Add task</button>{% endif %}
     <div class="col-body">
       {% for t in columns[status] %}
       <a class="kcard" href="/tasks/{{ t.id }}">
-        <div class="between"><span class="code">{{ t.code }}</span>
-          {% if t.priority.value in ['High','Critical'] %}{{ badge(t.priority) }}{% endif %}</div>
-        <div class="ktitle">{{ t.title }}</div>
-        <div class="kfoot">
+        <div class="kmeta">
+          <span class="code">{{ t.code }}</span>
+          {% if t.priority.value in ['High','Critical'] %}{{ badge(t.priority) }}{% endif %}
+          <span class="kspacer"></span>
+          {% if t.due_date %}<span class="kdue">{{ t.due_date|shortdate }}</span>{% endif %}
           {{ stack(t.assignees, 3) }}
-          {% if t.due_date %}<span class="dim mono" style="font-size:10.5px">{{ t.due_date|shortdate }}</span>{% endif %}
         </div>
+        <div class="ktitle">{{ t.title }}</div>
       </a>
       {% endfor %}
     </div>
@@ -111,8 +113,8 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projectTaskTitle">
     <div class="modal-h">
       <div>
-        <div class="kicker">New task</div>
-        <h3 id="projectTaskTitle">Add to {{ project.name }}</h3>
+        <div class="kicker">New task · {{ project.name }}</div>
+        <h3 id="projectTaskTitle">Add to <span id="projectTaskColumn">Todo</span></h3>
       </div>
       <button type="button" class="modal-x" id="projectTaskClose" aria-label="Close">&times;</button>
     </div>
@@ -248,10 +250,15 @@
     var due = document.getElementById("projectTaskDue");
     var assignees = document.getElementById("projectTaskAssignees");
     var error = document.getElementById("projectTaskError");
-    if (!modal || !open) return;
+    var column = document.getElementById("projectTaskColumn");
+    var projectBoard = document.getElementById("projectBoard");
+    var pendingStatus = "Todo";
+    if (!modal) return;
 
     function closeModal() { modal.hidden = true; }
-    function openModal() {
+    function openModal(status) {
+      pendingStatus = status || "Todo";
+      column.textContent = pendingStatus;
       name.value = "";
       due.value = "";
       priority.value = "Medium";
@@ -273,6 +280,7 @@
           body: JSON.stringify({
             project_id: Number(modal.dataset.project),
             title: name.value.trim(),
+            status: pendingStatus,
             priority: priority.value,
             due_date: due.value || null,
             assignees: Array.from(assignees.querySelectorAll("input:checked")).map(function (input) { return Number(input.value); })
@@ -287,7 +295,13 @@
         create.disabled = false;
       }
     }
-    open.addEventListener("click", openModal);
+    if (open) open.addEventListener("click", function () { openModal("Todo"); });
+    if (projectBoard) {
+      projectBoard.addEventListener("click", function (event) {
+        var btn = event.target.closest(".add-card");
+        if (btn) openModal(btn.dataset.add);
+      });
+    }
     close.addEventListener("click", closeModal);
     cancel.addEventListener("click", closeModal);
     create.addEventListener("click", createTask);
