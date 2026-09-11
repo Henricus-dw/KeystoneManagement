@@ -8,7 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import APP_NAME, SECRET_KEY, SESSION_COOKIE, STATIC_DIR
 from app.deps import AuthRedirect
-from app.routers import api, auth, pages, servers
+from app.routers import api, auth, changelog, pages, servers
 from app.seed import seed
 from app.hours_scheduler import process_hours_deadline
 
@@ -33,6 +33,7 @@ async def auth_redirect_handler(request: Request, exc: AuthRedirect):
 app.include_router(auth.router)
 app.include_router(pages.router)
 app.include_router(servers.router)
+app.include_router(changelog.router)
 app.include_router(api.router)
 
 

@@ -98,6 +98,14 @@ class ServerEnv(str, enum.Enum):
     other = "Other"
 
 
+class ChangeTag(str, enum.Enum):
+    """Label on a single patch-note line."""
+
+    new = "New"
+    improved = "Improved"
+    fixed = "Fixed"
+
+
 # ---------------------------------------------------------------------------
 # Association tables
 # ---------------------------------------------------------------------------
@@ -392,3 +400,42 @@ class Server(Base):
     def can_manage(self, user: User) -> bool:
         """Edit / share / delete -- owner or Admin only."""
         return self.owner_id == user.id or user.role == UserRole.admin
+
+
+class ChangelogRelease(Base):
+    """
+    One release on the "What's new" page. Admins add, edit and delete these
+    in-app; releases that shipped before the editor existed are seeded from
+    app/changelog.py the first time the table is created.
+    """
+
+    __tablename__ = "changelog_releases"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    release_date: Mapped[date] = mapped_column(Date, nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    changes: Mapped[list[ChangelogChange]] = relationship(
+        back_populates="release", cascade="all, delete-orphan",
+        order_by="ChangelogChange.position",
+    )
+
+
+class ChangelogChange(Base):
+    """A single tagged line within a release (New / Improved / Fixed)."""
+
+    __tablename__ = "changelog_changes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    release_id: Mapped[int] = mapped_column(
+        ForeignKey("changelog_releases.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0)  # order within the release
+    tag: Mapped[ChangeTag] = mapped_column(Enum(ChangeTag), default=ChangeTag.new)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    release: Mapped[ChangelogRelease] = relationship(back_populates="changes")

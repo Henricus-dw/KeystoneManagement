@@ -1,18 +1,31 @@
 """
-Patch notes / changelog for Keystone.
+Patch notes for Keystone.
 
-This is the single source of truth for the "What's new" page. To add a release,
-prepend a new entry to CHANGELOG (newest first). Each change is a
-(tag, text) pair; tag is one of: "New", "Improved", "Fixed".
+Releases live in the database and are managed by admins from the "What's new"
+page. SEED_RELEASES is read only once: when the changelog table is first
+created, these releases (which shipped before the in-app editor existed) are
+copied into it. Editing this list after that has no effect on an existing
+database.
 
 Keep the prose plain: no em dashes.
 """
 from __future__ import annotations
 
-CHANGELOG: list[dict] = [
+from datetime import date
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db import SessionLocal
+from app.models import ChangeTag, ChangelogChange, ChangelogRelease
+
+# Latest release date first; the more recently created entry wins a same-day tie.
+NEWEST_FIRST = (ChangelogRelease.release_date.desc(), ChangelogRelease.id.desc())
+
+SEED_RELEASES: list[dict] = [
     {
         "version": "1.1",
-        "date": "7 September 2026",
+        "date": date(2026, 9, 7),
         "title": "Servers vault and personal touches",
         "summary": "A shared home for infrastructure details, plus a colour of your own.",
         "changes": [
@@ -30,7 +43,7 @@ CHANGELOG: list[dict] = [
     },
     {
         "version": "1.0",
-        "date": "4 September 2026",
+        "date": date(2026, 9, 4),
         "title": "Keystone launch",
         "summary": "The first release of Keystone, the project-execution dashboard "
                    "for Asimotech's directors and dev team.",
@@ -51,5 +64,25 @@ CHANGELOG: list[dict] = [
     },
 ]
 
-# The current version is whatever sits at the top of the changelog.
-APP_VERSION: str = CHANGELOG[0]["version"]
+
+def seed_changelog(db: Session) -> None:
+    """Copy SEED_RELEASES into a freshly created changelog table."""
+    for release in SEED_RELEASES:
+        db.add(ChangelogRelease(
+            version=release["version"],
+            release_date=release["date"],
+            title=release["title"],
+            summary=release["summary"],
+            changes=[
+                ChangelogChange(position=i, tag=ChangeTag(tag), text=text)
+                for i, (tag, text) in enumerate(release["changes"])
+            ],
+        ))
+
+
+def latest_version() -> str:
+    """Version of the newest release, for the sidebar badge ("" if there are none)."""
+    with SessionLocal() as db:
+        return db.scalar(
+            select(ChangelogRelease.version).order_by(*NEWEST_FIRST).limit(1)
+        ) or ""
