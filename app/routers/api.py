@@ -100,14 +100,17 @@ def create_task(payload: CreatePayload,
     if not assignees:
         assignees = [user]
 
-    max_order = db.scalar(
-        select(func.coalesce(func.max(Task.order), 0)).where(
+    # Columns sort by Task.order ascending, so sorting below the current minimum
+    # puts a new task at the top of its column -- next to the "+ Add task" button
+    # rather than buried under a long list.
+    min_order = db.scalar(
+        select(func.coalesce(func.min(Task.order), 0)).where(
             Task.project_id == project.id, Task.status == status
         )
     )
     task = Task(project_id=project.id, title=payload.title.strip(),
                 status=status, priority=priority, due_date=due,
-                order=(max_order or 0) + 1, assignees=assignees)
+                order=(min_order or 0) - 1, assignees=assignees)
     db.add(task)
     log_activity(db, user=user, verb="created",
                  summary=f'created task "{task.title}"', project=project, task=task)
