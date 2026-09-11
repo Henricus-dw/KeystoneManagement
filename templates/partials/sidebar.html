@@ -97,7 +97,8 @@
       <path d="M17 8a3 3 0 0 1 0 6" />
     </svg>
     <span>What's new</span>
-    <span class="ver">v{{ APP_VERSION }}</span>
+    {% set version = app_version() %}
+    {% if version %}<span class="ver">v{{ version }}</span>{% endif %}
   </a>
 
   <div class="me">

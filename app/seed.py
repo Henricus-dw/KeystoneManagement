@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
+from app.changelog import seed_changelog
 from app.db import Base, SessionLocal, engine
 from app.models import (
     Activity,
@@ -30,8 +31,15 @@ def _dt(days_ago: float) -> datetime:
 
 
 def init_db() -> None:
+    # Checked before create_all: the patch notes are seeded only when their table
+    # first appears, so deleting every release later doesn't bring them back.
+    changelog_is_new = not inspect(engine).has_table("changelog_releases")
     Base.metadata.create_all(engine)
     _migrate()
+    if changelog_is_new:
+        with SessionLocal() as db:
+            seed_changelog(db)
+            db.commit()
 
 
 def _migrate() -> None:

@@ -12,7 +12,6 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.changelog import CHANGELOG
 from app.config import HOURS_REPORT_RECIPIENT, HOURS_REPORTS_DIR, PROJECT_UPLOADS_DIR
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
@@ -1128,16 +1127,6 @@ def change_color(
     user.accent = accent.strip().upper()
     db.commit()
     return RedirectResponse("/account?color=1", status_code=303)
-
-
-# ---------------------------------------------------------------------------
-# What's new -- patch notes / changelog (any signed-in user)
-# ---------------------------------------------------------------------------
-@router.get("/changelog")
-def changelog_page(request: Request, user: User = Depends(require_user)):
-    return templates.TemplateResponse(request, "changelog.html", {
-        "user": user, "nav": "changelog", "entries": CHANGELOG,
-    })
 
 
 # ---------------------------------------------------------------------------

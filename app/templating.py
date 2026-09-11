@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 
 from fastapi.templating import Jinja2Templates
 
-from app.changelog import APP_VERSION
+from app.changelog import latest_version
 from app.config import APP_NAME, APP_TAGLINE, STATIC_DIR, TEMPLATES_DIR
 from app.models import (
     Priority,
@@ -45,6 +45,13 @@ def shortdate(value: date | None) -> str:
     return value.strftime("%d %b")
 
 
+def longdate(value: date | None) -> str:
+    """'7 September 2026'. Built by hand because %-d isn't supported on Windows."""
+    if value is None:
+        return ""
+    return f"{value.day} {value.strftime('%B %Y')}"
+
+
 def clocktime(value: datetime | None) -> str:
     if value is None:
         return ""
@@ -70,6 +77,7 @@ def stamp(value: datetime | None) -> str:
 
 templates.env.filters["timeago"] = timeago
 templates.env.filters["shortdate"] = shortdate
+templates.env.filters["longdate"] = longdate
 templates.env.filters["clocktime"] = clocktime
 templates.env.filters["stamp"] = stamp
 templates.env.filters["slug"] = slug
@@ -87,7 +95,9 @@ templates.env.globals["asset_ver"] = _asset_ver
 templates.env.globals.update(
     APP_NAME=APP_NAME,
     APP_TAGLINE=APP_TAGLINE,
-    APP_VERSION=APP_VERSION,
+    # A function, called on each render rather than fixed at startup, so a
+    # release published from the admin page shows in the sidebar straight away.
+    app_version=latest_version,
     ProjectStatus=ProjectStatus,
     TaskStatus=TaskStatus,
     Priority=Priority,
