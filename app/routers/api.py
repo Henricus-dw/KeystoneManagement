@@ -17,6 +17,14 @@ from app.services import log_activity, recompute_health
 router = APIRouter(prefix="/api")
 
 
+def _can_add_task(user: User, project: Project) -> bool:
+    return (
+        user.role in (UserRole.admin, UserRole.manager)
+        or user in project.members
+        or project.created_by == user.id
+    )
+
+
 class MovePayload(BaseModel):
     status: str
     order: int | None = None
@@ -82,7 +90,7 @@ def create_task(payload: CreatePayload,
     if not project or not payload.title.strip():
         return {"ok": False}
     # Developers may only add tasks to projects they're assigned to.
-    if user.role == UserRole.developer and user not in project.members:
+    if not _can_add_task(user, project):
         return {"ok": False, "error": "not a member of this project"}
     status = _status_from(payload.status) or TaskStatus.todo
     priority = next((p for p in Priority if p.value == payload.priority), Priority.medium)

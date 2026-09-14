@@ -243,6 +243,14 @@ def _can_edit_project(user: User, project: Project) -> bool:
     return user.role in (UserRole.admin, UserRole.manager) or project.created_by == user.id
 
 
+def _can_add_task(user: User, project: Project) -> bool:
+    return (
+        user.role in (UserRole.admin, UserRole.manager)
+        or user in project.members
+        or project.created_by == user.id
+    )
+
+
 def _can_upload_project(user: User, project: Project) -> bool:
     return _can_edit_project(user, project) or user in project.members
 
@@ -459,7 +467,7 @@ def project_detail(project_id: int, request: Request,
         "uploaded": request.query_params.get("uploaded") == "1",
         "can_delete": user.role in (UserRole.admin, UserRole.manager),
         "can_edit": _can_edit_project(user, project),
-        "can_add": user.role in (UserRole.admin, UserRole.manager) or user in project.members,
+        "can_add": _can_add_task(user, project),
         "can_upload": _can_upload_project(user, project),
     })
 
@@ -472,7 +480,14 @@ def board(request: Request, project_id: int | None = None,
           user: User = Depends(require_user), db: Session = Depends(get_db)):
     # Developers only see/select boards for their own projects; oversight sees all.
     if user.role == UserRole.developer:
-        projects = sorted(user.projects, key=lambda p: p.name)
+        projects = sorted(
+            {project for project in user.projects} | {
+                project for project in db.scalars(
+                    select(Project).where(Project.created_by == user.id)
+                )
+            },
+            key=lambda p: p.name,
+        )
     else:
         projects = list(db.scalars(select(Project).order_by(Project.name)))
 
