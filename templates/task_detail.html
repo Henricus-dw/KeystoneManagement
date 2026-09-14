@@ -8,6 +8,13 @@
 <style>
   .task-status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:10px; }
   .task-status-row select { width:auto; min-width:140px; padding-top:7px; padding-bottom:7px; }
+  .task-files { margin-bottom:18px; }
+  .task-file-upload { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-bottom:14px; margin-bottom:4px; border-bottom:1px solid var(--line-soft); }
+  .task-file-upload input[type="file"] { max-width:100%; }
+  .task-file-item { display:flex; align-items:center; gap:10px; padding:9px 0; }
+  .task-file-item:hover b { color:var(--teal); }
+  .task-file-item small { display:block; color:var(--dim); font-size:11px; margin-top:2px; }
+  .task-file-list { display:grid; gap:2px; }
 </style>
 {% endblock %}
 
@@ -26,6 +33,29 @@
       <div class="kicker" style="margin:18px 0 8px;color:var(--gold)">Notes</div>
       <p class="mb-0 muted" style="font-size:13.5px">{{ task.notes }}</p>
       {% endif %}
+    </div>
+
+    <div class="section-title" style="margin-top:0"><h2>Files</h2><div class="line"></div></div>
+    {% if request.query_params.get('uploaded') == '1' %}<div class="notice">File uploaded.</div>{% endif %}
+    {% if request.query_params.get('upload_error') == 'forbidden' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">You don't have permission to upload files to this task.</div>{% endif %}
+    {% if request.query_params.get('upload_error') == 'type' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">That file type isn't supported.</div>{% endif %}
+    {% if request.query_params.get('upload_error') == 'size' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">That file is too large. The maximum size is 25 MB.</div>{% endif %}
+    {% if request.query_params.get('upload_error') == 'missing' %}<div class="notice" style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)">That file is no longer available.</div>{% endif %}
+    <div class="card pad task-files">
+      {% if can_upload_task %}
+      <form method="post" action="/tasks/{{ task.id }}/attachments" enctype="multipart/form-data" class="task-file-upload">
+        <input type="file" name="file" accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" required>
+        <button class="btn primary sm" type="submit">Upload file</button>
+      </form>
+      {% endif %}
+      <div class="task-file-list">
+        {% for attachment in task.attachments %}
+        <a class="task-file-item" href="/tasks/{{ task.id }}/attachments/{{ attachment.id }}">
+          <span class="file-icon">↗</span>
+          <span><b>{{ attachment.filename }}</b><small>{{ (attachment.size / 1024)|round(1) }} KB · {{ attachment.created_at|stamp }}</small></span>
+        </a>
+        {% else %}<div class="dim">No task files uploaded yet.</div>{% endfor %}
+      </div>
     </div>
 
     <!-- Comments -->

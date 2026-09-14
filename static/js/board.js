@@ -84,6 +84,7 @@
   const elPriority = document.getElementById("ntPriority");
   const elDue = document.getElementById("ntDue");
   const elAssignees = document.getElementById("ntAssignees");
+  const elFiles = document.getElementById("ntFiles");
   let pendingStatus = "Todo";
   let pendingBody = null;
 
@@ -94,6 +95,7 @@
     elTitle.value = "";
     elDue.value = "";
     elPriority.value = "Medium";
+    if (elFiles) elFiles.value = "";
     // reset assignees -> only the creator checked
     elAssignees.querySelectorAll("input[type=checkbox]").forEach((c) => {
       c.checked = c.value === me;
@@ -136,6 +138,13 @@
     });
     const data = await res.json();
     if (data.ok) {
+      if (elFiles && elFiles.files.length) {
+        await Promise.all([...elFiles.files].map((file) => {
+          const form = new FormData();
+          form.append("file", file);
+          return fetch(`/tasks/${data.task.id}/attachments`, { method: "POST", body: form });
+        }));
+      }
       buildCard(pendingBody, data.task);
       updateProgress(data.progress);
       closeModal();

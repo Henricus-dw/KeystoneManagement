@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.config import HOURS_REPORT_RECIPIENT, HOURS_REPORTS_DIR, PROJECT_UPLOADS_DIR
+from app.config import HOURS_REPORT_RECIPIENT, HOURS_REPORTS_DIR, PROJECT_UPLOADS_DIR, TASK_UPLOADS_DIR
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
 from app.hours import (
@@ -32,6 +32,7 @@ from app.hours import (
 from app.reporting import build_activity_pdf
 from app.models import (
     Activity,
+    Attachment,
     Comment,
     Priority,
     Project,
@@ -252,6 +253,21 @@ def _project_file_path(attachment: ProjectAttachment) -> Path | None:
     if base not in path.parents or not path.is_file():
         return None
     return path
+
+
+def _task_file_path(attachment: Attachment) -> Path | None:
+    base = TASK_UPLOADS_DIR.resolve()
+    path = (base / attachment.filepath).resolve()
+    if base not in path.parents or not path.is_file():
+        return None
+    return path
+
+
+def _can_upload_task(user: User, task: Task) -> bool:
+    return (
+        user.role in (UserRole.admin, UserRole.manager)
+        or user in task.project.members
+    )
 
 
 @router.post("/projects/{project_id}/attachments")
@@ -507,7 +523,65 @@ def task_detail(task_id: int, request: Request,
     return templates.TemplateResponse(request, "task_detail.html", {
         "user": user, "nav": "board", "task": task, "members": task.project.members,
         "can_delete_task": can_delete_task,
+        "can_upload_task": _can_upload_task(user, task),
     })
+
+
+@router.post("/tasks/{task_id}/attachments")
+async def upload_task_attachment(
+    task_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    task = db.get(Task, task_id)
+    if not task:
+        return RedirectResponse("/board", status_code=303)
+    if not _can_upload_task(user, task):
+        return RedirectResponse(f"/tasks/{task_id}?upload_error=forbidden", status_code=303)
+
+    filename = Path(file.filename or "").name
+    suffix = Path(filename).suffix.lower()
+    if not filename or suffix not in PROJECT_FILE_TYPES:
+        return RedirectResponse(f"/tasks/{task_id}?upload_error=type", status_code=303)
+
+    contents = await file.read(MAX_PROJECT_FILE_BYTES + 1)
+    if len(contents) > MAX_PROJECT_FILE_BYTES:
+        return RedirectResponse(f"/tasks/{task_id}?upload_error=size", status_code=303)
+
+    stored_name = f"{secrets.token_hex(16)}{suffix}"
+    task_dir = TASK_UPLOADS_DIR / str(task_id)
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / stored_name).write_bytes(contents)
+    db.add(Attachment(
+        task_id=task_id,
+        filename=filename[:255],
+        filepath=f"{task_id}/{stored_name}",
+        content_type=file.content_type or "application/octet-stream",
+        size=len(contents),
+        uploaded_by=user.id,
+    ))
+    db.commit()
+    return RedirectResponse(f"/tasks/{task_id}?uploaded=1", status_code=303)
+
+
+@router.get("/tasks/{task_id}/attachments/{attachment_id}")
+def download_task_attachment(
+    task_id: int,
+    attachment_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    attachment = db.get(Attachment, attachment_id)
+    if not attachment or attachment.task_id != task_id:
+        return RedirectResponse(f"/tasks/{task_id}", status_code=303)
+    task = db.get(Task, task_id)
+    if not task or not _can_upload_task(user, task):
+        return Response(status_code=404)
+    path = _task_file_path(attachment)
+    if not path:
+        return RedirectResponse(f"/tasks/{task_id}?upload_error=missing", status_code=303)
+    return FileResponse(path, media_type=attachment.content_type, filename=attachment.filename)
 
 
 @router.post("/tasks/{task_id}/delete")

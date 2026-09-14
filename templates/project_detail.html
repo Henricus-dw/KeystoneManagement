@@ -136,6 +136,10 @@
           {% endfor %}
         </div>
       </label>
+      <label class="field mb-0" style="margin-top:14px"><span>Files</span>
+        <input type="file" id="projectTaskFiles" multiple accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip">
+        <small class="dim">Images, documents, and PDFs up to 25 MB each</small>
+      </label>
       <div id="projectTaskError" class="dim" style="color:var(--red);font-size:12px;margin-top:10px" hidden></div>
     </div>
     <div class="modal-f">
@@ -249,6 +253,7 @@
     var priority = document.getElementById("projectTaskPriority");
     var due = document.getElementById("projectTaskDue");
     var assignees = document.getElementById("projectTaskAssignees");
+    var files = document.getElementById("projectTaskFiles");
     var error = document.getElementById("projectTaskError");
     var column = document.getElementById("projectTaskColumn");
     var projectBoard = document.getElementById("projectBoard");
@@ -262,6 +267,7 @@
       name.value = "";
       due.value = "";
       priority.value = "Medium";
+      if (files) files.value = "";
       error.hidden = true;
       assignees.querySelectorAll("input[type=checkbox]").forEach(function (input) {
         input.checked = input.value === modal.dataset.me;
@@ -288,6 +294,13 @@
         });
         var data = await response.json();
         if (!data.ok) throw new Error(data.error || "Task could not be created.");
+        if (files && files.files.length) {
+          await Promise.all(Array.from(files.files).map(function (file) {
+            var form = new FormData();
+            form.append("file", file);
+            return fetch("/tasks/" + data.task.id + "/attachments", { method: "POST", body: form });
+          }));
+        }
         window.location.reload();
       } catch (err) {
         error.textContent = err.message;
