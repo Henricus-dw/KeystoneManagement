@@ -123,6 +123,8 @@ def create_task(payload: CreatePayload,
             task_id=task.id,
             task_title=task.title,
             project_name=project.name,
+            priority=priority.value,
+            due_date=due.strftime("%d %b %Y") if due else "Not set",
             assigned_by=user.name,
         )
     return {

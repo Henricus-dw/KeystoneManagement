@@ -111,6 +111,8 @@ def send_task_assignment_email(
     task_id: int,
     task_title: str,
     project_name: str,
+    priority: str,
+    due_date: str,
     assigned_by: str,
 ) -> None:
     """Send a task assignment email through Microsoft Graph."""
@@ -122,6 +124,8 @@ def send_task_assignment_email(
             f"Hi {recipient_name},\n\n"
             f"{assigned_by} assigned you the task \"{task_title}\" "
             f"in the project \"{project_name}\".\n\n"
+            f"Priority: {priority}\n"
+            f"Due date: {due_date}\n\n"
             f"View the task: {task_url}\n\n"
             "Keystone"
         ),
