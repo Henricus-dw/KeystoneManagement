@@ -239,16 +239,12 @@ def _parse_date(value: str):
 
 
 def _can_edit_project(user: User, project: Project) -> bool:
-    """Admins/Managers may edit any project; the creator may edit their own."""
-    return user.role in (UserRole.admin, UserRole.manager) or project.created_by == user.id
+    """Admins, managers, and developers may edit any project."""
+    return user.role in (UserRole.admin, UserRole.manager, UserRole.developer)
 
 
 def _can_add_task(user: User, project: Project) -> bool:
-    return (
-        user.role in (UserRole.admin, UserRole.manager)
-        or user in project.members
-        or project.created_by == user.id
-    )
+    return user.role in (UserRole.admin, UserRole.manager, UserRole.developer)
 
 
 def _can_upload_project(user: User, project: Project) -> bool:
@@ -478,16 +474,9 @@ def project_detail(project_id: int, request: Request,
 @router.get("/board")
 def board(request: Request, project_id: int | None = None,
           user: User = Depends(require_user), db: Session = Depends(get_db)):
-    # Developers only see/select boards for their own projects; oversight sees all.
+    # Every signed-in role can see the projects available in the workspace.
     if user.role == UserRole.developer:
-        projects = sorted(
-            {project for project in user.projects} | {
-                project for project in db.scalars(
-                    select(Project).where(Project.created_by == user.id)
-                )
-            },
-            key=lambda p: p.name,
-        )
+        projects = list(db.scalars(select(Project).order_by(Project.name)))
     else:
         projects = list(db.scalars(select(Project).order_by(Project.name)))
 

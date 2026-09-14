@@ -18,11 +18,7 @@ router = APIRouter(prefix="/api")
 
 
 def _can_add_task(user: User, project: Project) -> bool:
-    return (
-        user.role in (UserRole.admin, UserRole.manager)
-        or user in project.members
-        or project.created_by == user.id
-    )
+    return user.role in (UserRole.admin, UserRole.manager, UserRole.developer)
 
 
 class MovePayload(BaseModel):
