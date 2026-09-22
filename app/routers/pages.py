@@ -269,8 +269,9 @@ def _task_file_path(attachment: Attachment) -> Path | None:
 
 def _can_upload_task(user: User, task: Task) -> bool:
     return (
-        user.role in (UserRole.admin, UserRole.manager)
+        user.role in (UserRole.admin, UserRole.manager, UserRole.developer)
         or user in task.project.members
+        or user in task.assignees
     )
 
 

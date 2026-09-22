@@ -295,11 +295,19 @@
         var data = await response.json();
         if (!data.ok) throw new Error(data.error || "Task could not be created.");
         if (files && files.files.length) {
-          await Promise.all(Array.from(files.files).map(function (file) {
+          var uploads = await Promise.all(Array.from(files.files).map(function (file) {
             var form = new FormData();
             form.append("file", file);
-            return fetch("/tasks/" + data.task.id + "/attachments", { method: "POST", body: form });
+            return fetch("/tasks/" + data.task.id + "/attachments", {
+              method: "POST",
+              body: form
+            });
           }));
+          if (uploads.some(function (upload) {
+            return !upload.ok || new URL(upload.url).searchParams.get("uploaded") !== "1";
+          })) {
+            throw new Error("The task was created, but one or more files could not be uploaded.");
+          }
         }
         window.location.reload();
       } catch (err) {
