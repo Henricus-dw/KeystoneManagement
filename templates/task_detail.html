@@ -20,7 +20,7 @@
 
 {% block topbar_actions %}
   {{ badge(task.status) }}
-  <a class="btn sm" href="/board?project_id={{ task.project_id }}">← Board</a>
+  <a class="btn sm" href="/board?project_id={{ task.project_id }}" aria-label="Back to {{ task.project.name }} tasks">← Back to tasks</a>
 {% endblock %}
 
 {% block content %}
