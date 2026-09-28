@@ -824,13 +824,19 @@ def hours_tracker(
         MonthlyHoursSubmission.report_month == report_month
     ).options(selectinload(MonthlyHoursSubmission.user))))
     submitted_names = {member_key(submission.user) for submission in month_submissions}
-    submitted_count = len(submitted_names & REQUIRED_MEMBER_NAMES)
+    required_members = [
+        member for member in db.scalars(select(User).order_by(User.name))
+        if is_required_member(member)
+    ]
     return _hours_template(request, user, HOURS_CUSTOMERS,
                            entries=[{"customer": "", "other_customer": "", "duration": "", "description": ""}],
                            month=report_month.strftime("%Y-%m"),
                            **_hours_page_values(report_month),
                            review_available=bool(cycle and cycle.workbook_path),
-                           submitted_count=submitted_count,
+                           team_submissions=[
+                               {"name": member.name, "submitted": member_key(member) in submitted_names}
+                               for member in required_members
+                           ],
                            all_members_submitted=REQUIRED_MEMBER_NAMES.issubset(submitted_names),
                            submitted=request.query_params.get("submitted") == "1")
 
