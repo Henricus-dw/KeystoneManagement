@@ -36,7 +36,7 @@ GRAPH_SENDER = os.getenv(
 )
 HOURS_REPORT_RECIPIENT = os.getenv(
 	"KEYSTONE_HOURS_REPORT_RECIPIENT",
-	"taskeen@professional.za.com",
+	"benjamin@professional.za.com",
 )
 APP_BASE_URL = os.getenv(
 	"KEYSTONE_APP_BASE_URL",
