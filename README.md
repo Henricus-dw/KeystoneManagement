@@ -56,14 +56,16 @@ are sent to `benjamin@professional.za.com`.
 
 ### Monthly hours workflow
 
-Hours are validated against 9 hours for each Monday-Friday working day in the
-selected month, excluding South African public holidays. The next month's
-tracker becomes available from the 20th of the preceding month. The due date
-is the first working day of the following month. Each of Henri, Darryl, Jean, and
-Taskeen submits once for the month; after all four submissions are received,
-Keystone sends one workbook with a separate worksheet per member. At 12:00
-SAST on the due date, missing members receive a reminder from the notification
-mailbox.
+Required hours are calculated as 9 hours for each Monday-Friday working day in
+the selected month, excluding South African public holidays. The tracker shows
+the previous month until the 20th, then switches to the current month. The due
+date is the first working day of the following month. After the first of Henri,
+Darryl, Jean, or Taskeen submits, the consolidated workbook becomes available
+for review; each subsequent submission adds that member's worksheet. Any team
+member can review and edit the workbook, but Send remains disabled until all
+four have submitted. Clicking Send emails the workbook to the configured
+recipient and CCs all four members. At 12:00 SAST on the due date, missing
+members receive a reminder from the notification mailbox.
 
 ### Demo logins (password is `keystone` for everyone)
 

@@ -18,7 +18,7 @@
 		{% if all_members_submitted %}
 		<div class="notice success">Your hours were saved. All 4 members have submitted their hours for {{ report_month_label }}. The consolidated workbook is available for review and submission.</div>
 		{% else %}
-		<div class="notice success">Your hours were saved. The consolidated team workbook will be available for review after all four team members submit.</div>
+		<div class="notice success">Your hours were saved. The review workbook is available now; sending will be enabled after all four team members submit.</div>
 		{% endif %}
 		{% endif %}
 		<div class="notice">
@@ -34,7 +34,7 @@
 			{% if review_available %}
 			<div style="margin-top:12px"><a href="/hours-tracker/review?month={{ month }}">Review the consolidated {{ report_month_label }} workbook</a></div>
 			{% else %}
-			<div class="dim" style="margin-top:12px">The consolidated workbook will be available after all four members submit.</div>
+			<div class="dim" style="margin-top:12px">The review workbook will be available after the first member submits.</div>
 			{% endif %}
 		</div>
 		{% if error %}

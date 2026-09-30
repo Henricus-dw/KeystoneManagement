@@ -781,15 +781,14 @@ def require_hours_reviewer(user: User = Depends(require_user)) -> User:
 
 
 def _ensure_hours_workbook(db: Session, report_month: date) -> MonthlyHoursCycle | None:
-    """Create the review workbook when all four saved submissions are present."""
+    """Create the review workbook as soon as the first submission is present."""
     cycle = db.get(MonthlyHoursCycle, report_month)
     if cycle and cycle.workbook_path and Path(cycle.workbook_path).is_file():
         return cycle
     submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == report_month
     ).options(selectinload(MonthlyHoursSubmission.user))))
-    submitted_names = {member_key(submission.user) for submission in submissions}
-    if not REQUIRED_MEMBER_NAMES.issubset(submitted_names):
+    if not submissions:
         return cycle
     if not cycle:
         cycle = MonthlyHoursCycle(report_month=report_month)
@@ -949,10 +948,12 @@ def hours_review(
         return RedirectResponse(f"/hours-tracker/review?month={active_month:%Y-%m}", status_code=303)
     cycle = _ensure_hours_workbook(db, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
+    month_submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
+        MonthlyHoursSubmission.report_month == report_month
+    ).options(selectinload(MonthlyHoursSubmission.user))))
+    submitted_names = {member_key(submission.user) for submission in month_submissions}
+    all_members_submitted = REQUIRED_MEMBER_NAMES.issubset(submitted_names)
     if not path:
-        submitted_count = db.scalar(select(func.count(MonthlyHoursSubmission.id)).where(
-            MonthlyHoursSubmission.report_month == report_month
-        )) or 0
         return templates.TemplateResponse(request, "hours_review.html", {
             "user": user,
             "nav": "hours",
@@ -961,7 +962,8 @@ def hours_review(
             "sheets": [],
             "sent": False,
             "waiting": True,
-            "submitted_count": submitted_count,
+            "submitted_count": len(submitted_names),
+            "all_members_submitted": all_members_submitted,
         })
     return templates.TemplateResponse(request, "hours_review.html", {
         "user": user,
@@ -970,6 +972,7 @@ def hours_review(
         "month_label": report_month.strftime("%B %Y"),
         "sheets": workbook_sheets(path),
         "sent": cycle.consolidated_sent,
+        "all_members_submitted": all_members_submitted,
         "saved": request.query_params.get("saved") == "1",
         "sent_now": request.query_params.get("sent") == "1",
     })
@@ -1035,6 +1038,12 @@ def send_hours_review(
     cycle = db.get(MonthlyHoursCycle, report_month)
     path = _hours_cycle_path(cycle) if cycle else None
     if not path or cycle.consolidated_sent:
+        return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
+    submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
+        MonthlyHoursSubmission.report_month == report_month
+    ).options(selectinload(MonthlyHoursSubmission.user))))
+    submitted_names = {member_key(submission.user) for submission in submissions}
+    if not REQUIRED_MEMBER_NAMES.issubset(submitted_names):
         return RedirectResponse(f"/hours-tracker/review?month={month}", status_code=303)
     members = [member for member in db.scalars(select(User)) if is_required_member(member)]
     if len(members) != len(REQUIRED_MEMBER_NAMES):

@@ -14,11 +14,11 @@
   </div>
   {% if saved %}<div class="notice success">Workbook changes saved on the server.</div>{% endif %}
   {% if sent_now %}<div class="notice success">The consolidated workbook was sent to the recipient and CC'd to all four team members.</div>{% endif %}
-  <p class="dim" style="line-height:1.6">Review each member's worksheet below. Click a cell to edit it; changes are saved to the server automatically. Send the saved workbook when it is ready.</p>
+  <p class="dim" style="line-height:1.6">Review each submitted member's worksheet below. Click a cell to edit it; changes are saved to the server automatically. The workbook can be sent after all four members submit.</p>
   <div id="autosave-status" class="dim" style="font-size:12px;margin-bottom:12px">All changes saved</div>
 
   {% if waiting %}
-  <div class="notice">The consolidated workbook is not ready yet. {{ submitted_count }} of 4 team members have submitted their hours. This page will show the member worksheets once all four submissions are complete.</div>
+  <div class="notice">No one has submitted hours for this month yet. The review workbook will be available after the first submission.</div>
   {% else %}
 
   <div class="tabs" role="tablist">
@@ -53,8 +53,8 @@
   </form>
   <form method="post" action="/hours-tracker/review/send" id="send-workbook-form" style="margin-top:10px">
     <input type="hidden" name="month" value="{{ month }}" />
-    <button class="btn primary" type="submit" {{ 'disabled' if sent else '' }}>
-      {{ 'Workbook already sent - edit a worksheet to resend' if sent else 'Send consolidated workbook' }}
+    <button class="btn primary" type="submit" {{ 'disabled' if sent or not all_members_submitted else '' }}>
+      {{ 'Workbook already sent - edit a worksheet to resend' if sent else ('Send available after all four submit' if not all_members_submitted else 'Send consolidated workbook') }}
     </button>
   </form>
   {% endif %}
@@ -113,7 +113,7 @@
       if (window.confirm('Are you sure you want to delete this entry?')) {
         button.closest('tr').remove();
         manualSaveRequired = true;
-        if (sendButton) {
+        if (sendButton && canSend) {
           sendButton.disabled = false;
           sendButton.textContent = 'Send consolidated workbook';
         }
@@ -131,6 +131,7 @@
   }
   const sendForm = document.getElementById('send-workbook-form');
   const sendButton = sendForm?.querySelector('button[type="submit"]');
+  const canSend = {{ 'true' if all_members_submitted else 'false' }};
   if (sendForm) {
     sendForm.addEventListener('submit', (event) => {
       if (manualSaveRequired) {
@@ -147,7 +148,7 @@
   document.querySelectorAll('.review-table').forEach((table) => {
     table.addEventListener('input', () => {
       manualSaveRequired = true;
-      if (sendButton) {
+      if (sendButton && canSend) {
         sendButton.disabled = false;
         sendButton.textContent = 'Send consolidated workbook';
       }
