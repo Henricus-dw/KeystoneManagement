@@ -88,19 +88,11 @@
     {% else %}
     </button>
     {% endif %}
-    {% if recent_done|length %}
-    <a class="card pad stat" href="/tasks/recent">
-    {% else %}
-    <button class="card pad stat stat-action" type="button" data-empty-message="There are no recently completed tasks.">
-    {% endif %}
-      <div class="kicker">Recently completed tasks</div>
-      <div class="num">{{ recent_done|length }}</div>
-      <div class="sub">tasks shipped lately</div>
-    {% if recent_done|length %}
-    </a>
-    {% else %}
-    </button>
-    {% endif %}
+    <div class="card pad stat">
+      <div class="kicker">My tasks</div>
+      <div class="num">{{ my_task_count }}</div>
+      <div class="sub">outstanding assignments</div>
+    </div>
     {% if stats.team %}
     <a class="card pad stat accent" href="/team">
     {% else %}
@@ -166,17 +158,22 @@
     </div>
     {% endif %}
 
-    <div class="section-title"><h2>Recently completed tasks</h2><div class="line"></div></div>
+    <div class="section-title"><h2>My tasks</h2><div class="line"></div></div>
     <div class="card pad">
-      {% for t in recent_done %}
+      {% for t in my_tasks %}
       <div class="between" style="padding:8px 0;{{ 'border-top:1px solid var(--line-soft)' if not loop.first }}">
         <div class="row">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal-2)" stroke-width="2"><path d="M5 12l4 4L19 7"/></svg>
-          <span style="font-size:13.5px">{{ t.title }}</span>
+          {{ badge(t.status) }}
+          <a href="/tasks/{{ t.id }}" style="font-size:13.5px">{{ t.title }}</a>
         </div>
         <span class="dim mono" style="font-size:11px">{{ t.project.name }}</span>
       </div>
-      {% else %}<div class="dim">Nothing completed yet.</div>{% endfor %}
+      {% else %}<div class="dim">You have no outstanding assigned tasks.</div>{% endfor %}
+      {% if my_task_count > my_tasks|length %}
+      <div class="dim" style="padding-top:10px;font-size:12px">
+        Showing the next {{ my_tasks|length }} of {{ my_task_count }} outstanding tasks.
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>

@@ -90,12 +90,21 @@ def dashboard(request: Request, user: User = Depends(require_user), db: Session 
 
     overall = round(sum(p.progress for p in active) / len(active)) if active else 0
 
-    recent_done = list(
+    my_task_count = db.scalar(
+        select(func.count(Task.id)).where(
+            Task.assignees.any(User.id == user.id),
+            Task.status != TaskStatus.done,
+        )
+    ) or 0
+    my_tasks = list(
         db.scalars(
             select(Task)
-            .options(selectinload(Task.project), selectinload(Task.assignees))
-            .where(Task.status == TaskStatus.done)
-            .order_by(Task.updated_at.desc())
+            .options(selectinload(Task.project))
+            .where(
+                Task.assignees.any(User.id == user.id),
+                Task.status != TaskStatus.done,
+            )
+            .order_by(Task.due_date.asc().nulls_last(), Task.updated_at.asc())
             .limit(6)
         )
     )
@@ -114,7 +123,8 @@ def dashboard(request: Request, user: User = Depends(require_user), db: Session 
         "at_risk": at_risk,
         "waiting": waiting,
         "overall": overall,
-        "recent_done": recent_done,
+        "my_tasks": my_tasks,
+        "my_task_count": my_task_count,
         "stats": {
             "active": len(active),
             "total_projects": len(projects),

@@ -105,7 +105,7 @@ Admins additionally get **Team Members** (create/list users).
 ## What's in the app
 
 - **Dashboard** — overall completion ring, projects in flight, at-risk / waiting-on-client
-  counts, team activity feed, recently completed tasks.
+  counts, team activity feed, and the signed-in user's outstanding assigned tasks.
 - **Projects** — list + detail with derived progress, health, team, brief, and a board snapshot.
 - **Kanban** — drag-and-drop across Todo → In Progress → Blocked → Testing → Done,
   with live progress recalculation and quick "add task".
