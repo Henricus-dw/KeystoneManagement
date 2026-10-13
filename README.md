@@ -106,6 +106,7 @@ Admins additionally get **Team Members** (create/list users).
 
 - **Dashboard** — overall completion ring, projects in flight, at-risk / waiting-on-client
   counts, team activity feed, and all of the signed-in user's outstanding assigned tasks.
+  Tasks with deadlines appear earliest first; tasks without deadlines follow, grouped by project.
 - **Projects** — list + detail with derived progress, health, team, brief, and a board snapshot.
 - **Kanban** — drag-and-drop across Todo → In Progress → Blocked → Testing → Done,
   with live progress recalculation and quick "add task".

@@ -93,12 +93,19 @@ def dashboard(request: Request, user: User = Depends(require_user), db: Session 
     my_tasks = list(
         db.scalars(
             select(Task)
+            .join(Task.project)
             .options(selectinload(Task.project))
             .where(
                 Task.assignees.any(User.id == user.id),
                 Task.status != TaskStatus.done,
             )
-            .order_by(Task.due_date.asc().nulls_last(), Task.updated_at.asc())
+            .order_by(
+                Task.due_date.asc().nulls_last(),
+                func.lower(Project.name).asc(),
+                Project.id.asc(),
+                Task.updated_at.asc(),
+                Task.id.asc(),
+            )
         )
     )
 
