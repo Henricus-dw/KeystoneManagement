@@ -353,9 +353,9 @@ class Server(Base):
     the details a developer needs to reach it.
 
     Access model: a server is *private to its owner* when created. Setting
-    ``shared`` makes it visible (read-only) to every signed-in user, so the
-    team can use it as a shared reference. Only the owner or an Admin may edit,
-    share/unshare, or delete an entry.
+    ``shared`` lets every signed-in user view, edit, or delete the entry.
+    Private entries remain restricted to their owner or an Admin, who also
+    control sharing/unsharing.
 
     NOTE: ``secret`` (password / key / access token) is stored in clear text --
     there is no crypto dependency in this project. It is masked in the UI and
@@ -398,7 +398,11 @@ class Server(Base):
         return self.shared or self.owner_id == user.id or user.role == UserRole.admin
 
     def can_manage(self, user: User) -> bool:
-        """Edit / share / delete -- owner or Admin only."""
+        """Every viewer may edit or delete the entry."""
+        return self.can_view(user)
+
+    def can_share(self, user: User) -> bool:
+        """Only the owner or an Admin may change visibility."""
         return self.owner_id == user.id or user.role == UserRole.admin
 
 

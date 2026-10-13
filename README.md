@@ -116,6 +116,10 @@ Admins additionally get **Team Members** (create/list users).
 - **Analytics** — tasks by status, throughput per developer, projects by status, and an
   auto-generated weekly summary per project.
 - **Task detail** — description, notes, comments/discussion, and metadata.
+- **Servers** — any signed-in user can edit or delete shared entries, regardless of
+  creator. Private entries and sharing controls remain restricted to the owner/admin.
+  Deleting an entry requires confirmation and removes its stored credentials and cover image,
+  not the actual VM or server.
 - **Admin** — team-member management.
 
 ---

@@ -59,14 +59,16 @@
           <b style="color:var(--gold)">not encrypted at rest</b>, so don't store anything you wouldn't keep in an internal wiki.</p>
       </div>
 
+      {% if not server or can_share %}
       <div class="card pad">
         <div class="card-h"><div class="kicker">Sharing</div></div>
         <label class="switch">
           <input type="checkbox" name="shared" value="1" {{ 'checked' if server and server.shared }}>
           <span class="switch-track"></span>
-          <span class="switch-text"><b>Share with the team</b><small>Every signed-in user can view this entry. Leave off to keep it private to you.</small></span>
+          <span class="switch-text"><b>Share with the team</b><small>Every signed-in user can view, edit and delete this entry. Leave off to keep it restricted to the owner and admins.</small></span>
         </label>
       </div>
+      {% endif %}
     </div>
   </div>
 

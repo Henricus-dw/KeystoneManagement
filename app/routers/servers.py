@@ -3,8 +3,8 @@ Servers & credentials vault.
 
 A place for the team to record servers, VMs, containers and the details needed
 to reach them. Entries are private to their owner until *shared*, at which point
-every signed-in user can see them (read-only). Only the owner or an Admin may
-edit, share or delete an entry.
+every signed-in user can view, edit or delete them. Private entries and
+sharing controls remain restricted to the owner or an Admin.
 
 Secrets are masked in the UI and never appear in list views or the activity
 log. They are, however, stored in clear text (no crypto dependency in this
@@ -95,6 +95,7 @@ def servers_list(request: Request, user: User = Depends(require_user), db: Sessi
     return templates.TemplateResponse(request, "servers.html", {
         "user": user, "nav": "servers", "mine": mine, "shared": shared,
         "created": request.query_params.get("created") == "1",
+        "deleted": request.query_params.get("deleted") == "1",
     })
 
 
@@ -161,6 +162,7 @@ def server_detail(server_id: int, request: Request,
     return templates.TemplateResponse(request, "server_detail.html", {
         "user": user, "nav": "servers", "server": server,
         "can_manage": server.can_manage(user),
+        "can_share": server.can_share(user),
     })
 
 
@@ -174,10 +176,11 @@ def edit_server_form(server_id: int, request: Request,
     if not server:
         return RedirectResponse("/servers", status_code=303)
     if not server.can_manage(user):
-        return RedirectResponse(f"/servers/{server_id}", status_code=303)
+        return RedirectResponse(f"/servers/{server_id}?error=forbidden", status_code=303)
     return templates.TemplateResponse(request, "server_form.html", {
         "user": user, "nav": "servers", "server": server,
         "kinds": list(ServerKind), "envs": list(ServerEnv),
+        "can_share": server.can_share(user),
     })
 
 
@@ -202,7 +205,7 @@ def update_server(
     if not server:
         return RedirectResponse("/servers", status_code=303)
     if not server.can_manage(user):
-        return RedirectResponse(f"/servers/{server_id}", status_code=303)
+        return RedirectResponse(f"/servers/{server_id}?error=forbidden", status_code=303)
     if not name.strip():
         return RedirectResponse(f"/servers/{server_id}/edit", status_code=303)
 
@@ -218,7 +221,8 @@ def update_server(
         server.secret = secret
     server.url = url.strip()
     server.notes = notes.strip()
-    server.shared = bool(shared)
+    if server.can_share(user):
+        server.shared = bool(shared)
     log_activity(db, user=user, verb="updated",
                  summary=f'updated server "{server.name}"')
     db.commit()
@@ -233,8 +237,8 @@ def toggle_share(server_id: int, user: User = Depends(require_user), db: Session
     server = db.get(Server, server_id)
     if not server:
         return RedirectResponse("/servers", status_code=303)
-    if not server.can_manage(user):
-        return RedirectResponse(f"/servers/{server_id}", status_code=303)
+    if not server.can_share(user):
+        return RedirectResponse(f"/servers/{server_id}?error=forbidden", status_code=303)
     server.shared = not server.shared
     verb = "shared" if server.shared else "updated"
     action = "shared" if server.shared else "made private"
@@ -319,4 +323,4 @@ def delete_server(server_id: int, user: User = Depends(require_user), db: Sessio
     db.delete(server)
     log_activity(db, user=user, verb="deleted", summary=f'deleted server "{name}"')
     db.commit()
-    return RedirectResponse("/servers", status_code=303)
+    return RedirectResponse("/servers?deleted=1", status_code=303)

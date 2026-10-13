@@ -10,6 +10,7 @@
 
 {% block content %}
 {% if created %}<div class="notice">Server saved.</div>{% endif %}
+{% if deleted %}<div class="notice">Server entry deleted.</div>{% endif %}
 
 {% macro srv_card(s, owned) %}
 <a class="srv-card" href="/servers/{{ s.id }}">
@@ -44,6 +45,7 @@
 <div class="section-title" style="margin-top:34px"><h2>Shared with you</h2><div class="line"></div>
   <span class="dim mono" style="font-size:11px">{{ shared|length }}</span></div>
 {% if shared %}
+<p class="dim" style="font-size:12.5px">Shared entries can be edited or deleted by any signed-in team member.</p>
 <div class="srv-grid">
   {% for s in shared %}{{ srv_card(s, false) }}{% endfor %}
 </div>
