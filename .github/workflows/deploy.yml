@@ -1,3 +1,4 @@
+
 name: Deploy Keystone
 
 on:
@@ -8,15 +9,19 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy to server
+      - name: Deploy to new Keystone VM
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 156.38.217.108
-          username: henridewitt
-          key: ${{ secrets.KEYSTONE_SSH_KEY }}
+          host: 156.38.217.107
+          username: tvallee
+          key: ${{ secrets.KEYSTONE_SSH_KEY_NEW }}
           script: |
+            set -e
             cd /var/www/keystone
-            GIT_SSH_COMMAND='ssh -i /home/henridewitt/.ssh/keystone_deploy_key -o IdentitiesOnly=yes' git fetch origin main
+            git fetch origin main
             git reset --hard origin/main
-            sudo -n systemctl restart keystone.service
+            sudo -n /usr/bin/systemctl restart keystone.service
+            sleep 5
+            systemctl is-active --quiet keystone.service
