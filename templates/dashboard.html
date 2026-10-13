@@ -169,11 +169,6 @@
         <span class="dim mono" style="font-size:11px">{{ t.project.name }}</span>
       </div>
       {% else %}<div class="dim">You have no outstanding assigned tasks.</div>{% endfor %}
-      {% if my_task_count > my_tasks|length %}
-      <div class="dim" style="padding-top:10px;font-size:12px">
-        Showing the next {{ my_tasks|length }} of {{ my_task_count }} outstanding tasks.
-      </div>
-      {% endif %}
     </div>
   </div>
 </div>
