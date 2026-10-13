@@ -25,7 +25,7 @@
 {% endif %}
 
 {% if server.image %}
-<img class="srv-square" src="/servers/{{ server.id }}/image" alt="Cover image for {{ server.name }}">
+<img class="srv-square{{ ' fit-image' if server.image_fit }}" src="/servers/{{ server.id }}/image" alt="Cover image for {{ server.name }}">
 {% endif %}
 
 <div class="grid cols-4" style="margin-bottom:22px">
@@ -135,6 +135,7 @@
     object-fit: cover; border-radius: 14px; border: 1px solid var(--line);
     background-color: var(--bg-2); margin-bottom: 22px; }
   .card.danger { border-color: rgba(244,103,122,.32); }
+  .srv-square.fit-image { object-fit:contain; }
   .del summary { list-style: none; cursor: pointer; display: inline-flex; }
   .del summary::-webkit-details-marker { display: none; }
   .del[open] summary { display: none; }

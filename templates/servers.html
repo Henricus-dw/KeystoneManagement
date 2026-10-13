@@ -13,7 +13,7 @@
 {% if deleted %}<div class="notice">Server entry deleted.</div>{% endif %}
 
 {% macro srv_card(s, owned) %}
-<a class="srv-card" href="/servers/{{ s.id }}">
+<a class="srv-card{{ ' fit-image' if s.image and s.image_fit }}" href="/servers/{{ s.id }}">
   <div class="srv-cover{{ ' has-img' if s.image }}"{% if s.image %} style="background-image:url('/servers/{{ s.id }}/image')"{% endif %}>
     {% if not s.image %}
     <div class="srv-cover-ph">
@@ -61,7 +61,9 @@
   .srv-card:hover { border-color: rgba(28,196,216,.4); transform: translateY(-2px);
     box-shadow: 0 12px 30px -16px rgba(0,0,0,.7); }
   .srv-cover { position: absolute; inset: 0; background-color: var(--bg-2);
-    background-size: cover; background-position: center; }
+    background-size: cover; background-position: center; background-repeat: no-repeat; }
+  .srv-card.fit-image .srv-cover { bottom:86px; background-size:contain; }
+  .srv-card.fit-image .srv-cover::after { display:none; }
   /* Only a soft scrim at the very bottom, enough to read the text over -- the
      image itself is not faded out. */
   .srv-cover::after { content: ""; position: absolute; inset: 0;

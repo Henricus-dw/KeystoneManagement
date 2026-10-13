@@ -120,6 +120,9 @@ Admins additionally get **Team Members** (create/list users).
   creator. Private entries and sharing controls remain restricted to the owner/admin.
   Deleting an entry requires confirmation and removes its stored credentials and cover image,
   not the actual VM or server.
+  Image uploads offer **Fit entire image** to avoid cropping; the saved choice applies
+  to the server card, detail view, and edit preview. Existing images keep their fill
+  style unless changed. You can save a new fit setting without re-uploading the image.
 - **Admin** — team-member management.
 
 ---

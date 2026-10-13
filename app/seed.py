@@ -69,6 +69,9 @@ def _migrate() -> None:
             if "image" not in scols:
                 conn.exec_driver_sql(
                     "ALTER TABLE servers ADD COLUMN image VARCHAR(300) NOT NULL DEFAULT ''")
+            if "image_fit" not in scols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE servers ADD COLUMN image_fit BOOLEAN NOT NULL DEFAULT 0")
 
         if "monthly_hours_cycles" in tables:
             hcols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(monthly_hours_cycles)")]

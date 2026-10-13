@@ -264,13 +264,23 @@ def server_image(server_id: int, user: User = Depends(require_user), db: Session
 
 
 @router.post("/servers/{server_id}/image")
-async def upload_image(server_id: int, image: UploadFile = File(...),
+async def upload_image(server_id: int, image: UploadFile | None = File(None),
+                       image_fit: bool = Form(False),
                        user: User = Depends(require_user), db: Session = Depends(get_db)):
     server = db.get(Server, server_id)
     if not server:
         return RedirectResponse("/servers", status_code=303)
     if not server.can_manage(user):
         return RedirectResponse(f"/servers/{server_id}?error=forbidden", status_code=303)
+
+    if image is None or not image.filename:
+        if not server.image:
+            return RedirectResponse(f"/servers/{server_id}/edit?img_error=missing", status_code=303)
+        server.image_fit = image_fit
+        log_activity(db, user=user, verb="updated",
+                     summary=f'updated the image fit for "{server.name}"')
+        db.commit()
+        return RedirectResponse(f"/servers/{server_id}/edit", status_code=303)
 
     spec = ALLOWED_IMAGES.get(image.content_type)
     if not spec:
@@ -289,6 +299,7 @@ async def upload_image(server_id: int, image: UploadFile = File(...),
     fname = f"{server.id}-{secrets.token_hex(8)}.{ext}"
     (SERVER_IMAGES_DIR / fname).write_bytes(data)
     server.image = fname
+    server.image_fit = image_fit
     log_activity(db, user=user, verb="updated",
                  summary=f'updated the image for "{server.name}"')
     db.commit()
