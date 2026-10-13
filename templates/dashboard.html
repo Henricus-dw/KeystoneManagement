@@ -161,9 +161,6 @@
     <div class="section-title"><h2>My tasks</h2><div class="line"></div></div>
     <div class="card pad">
       {% for t in my_tasks %}
-      {% if t.due_date is none and (loop.first or loop.previtem.due_date is not none or loop.previtem.project_id != t.project_id) %}
-      <div class="kicker" style="padding:14px 0 6px">{{ t.project.name }} &middot; No due date</div>
-      {% endif %}
       <div class="between" style="padding:8px 0;{{ 'border-top:1px solid var(--line-soft)' if not loop.first }}">
         <div class="row">
           {{ badge(t.status) }}
