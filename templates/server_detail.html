@@ -5,6 +5,7 @@
 {% block heading %}{{ server.name }}{% endblock %}
 
 {% block topbar_actions %}
+  <a class="btn sm" href="/servers">&larr; Back</a>
   {{ badge(server.environment) }}
   {% if server.shared %}<span class="badge s-on-track plain">Shared</span>{% else %}<span class="badge s-on-hold plain">Private</span>{% endif %}
   {% if can_share %}
