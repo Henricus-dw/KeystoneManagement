@@ -85,6 +85,8 @@
   const elDue = document.getElementById("ntDue");
   const elAssignees = document.getElementById("ntAssignees");
   const elFiles = document.getElementById("ntFiles");
+  const elError = document.getElementById("ntError");
+  const elCreate = document.getElementById("ntCreate");
   let pendingStatus = "Todo";
   let pendingBody = null;
 
@@ -95,6 +97,7 @@
     elTitle.value = "";
     elDue.value = "";
     elPriority.value = "Medium";
+    elError.hidden = true;
     if (elFiles) elFiles.value = "";
     // reset assignees -> only the creator checked
     elAssignees.querySelectorAll("input[type=checkbox]").forEach((c) => {
@@ -121,22 +124,35 @@
   }
 
   async function createTask() {
+    if (elCreate.disabled) return;
     const title = elTitle.value.trim();
     if (!title) { elTitle.focus(); return; }
     const assignees = [...elAssignees.querySelectorAll("input:checked")].map((c) => Number(c.value));
-    const res = await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        project_id: Number(projectId),
-        title,
-        status: pendingStatus,
-        priority: elPriority.value,
-        due_date: elDue.value || null,
-        assignees,
-      }),
-    });
-    const data = await res.json();
+    elCreate.disabled = true;
+    elError.hidden = true;
+    let data;
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: Number(projectId),
+          title,
+          status: pendingStatus,
+          priority: elPriority.value,
+          due_date: elDue.value || null,
+          assignees,
+        }),
+      });
+      data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Task could not be created.");
+    } catch (err) {
+      elError.textContent = err.message;
+      elError.hidden = false;
+      return;
+    } finally {
+      elCreate.disabled = false;
+    }
     if (data.ok) {
       if (elFiles && elFiles.files.length) {
         await Promise.all([...elFiles.files].map((file) => {

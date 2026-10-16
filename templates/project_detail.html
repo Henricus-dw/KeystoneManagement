@@ -107,8 +107,6 @@
 </div>
 
 {% if can_add %}
-{% set assignee_opts = project.members | selectattr('role', 'equalto', UserRole.developer) | list %}
-{% if user.role == UserRole.developer and user not in assignee_opts %}{% set assignee_opts = assignee_opts + [user] %}{% endif %}
 <div class="modal-overlay" id="projectTaskModal" data-project="{{ project.id }}" data-me="{{ user.id }}" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projectTaskTitle">
     <div class="modal-h">
@@ -126,7 +124,7 @@
           <select id="projectTaskPriority">{% for p in Priority %}<option value="{{ p.value }}" {{ 'selected' if p.value == 'Medium' }}>{{ p.value }}</option>{% endfor %}</select></label>
         <label class="field mb-0"><span>Due date</span><input type="date" id="projectTaskDue"></label>
       </div>
-      <label class="field mb-0" style="margin-top:14px"><span>Assignees</span>
+      <div class="field mb-0" style="margin-top:14px"><span>Assignees</span>
         <div class="wrap" id="projectTaskAssignees" style="gap:8px;margin-top:4px">
           {% for member in assignee_opts %}
           <label class="pick">
@@ -135,7 +133,8 @@
           </label>
           {% endfor %}
         </div>
-      </label>
+        <small class="dim">Select anyone on the team. If none are selected, this task is assigned to you.</small>
+      </div>
       <label class="field mb-0" style="margin-top:14px"><span>Files</span>
         <input type="file" id="projectTaskFiles" multiple accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip">
         <small class="dim">Images, documents, and PDFs up to 25 MB each</small>

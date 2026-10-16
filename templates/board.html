@@ -59,10 +59,8 @@
   {% endfor %}
 </div>
 
-<!-- New-task modal (assignees: developers on this project) -->
+<!-- New-task modal -->
 {% if can_add %}
-{% set assignee_opts = project.members | selectattr('role', 'equalto', UserRole.developer) | list %}
-{% if user.role == UserRole.developer and user not in assignee_opts %}{% set assignee_opts = assignee_opts + [user] %}{% endif %}
 <div class="modal-overlay" id="taskModal" data-me="{{ user.id }}" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-label="New task">
     <div class="modal-h">
@@ -80,7 +78,7 @@
           <select id="ntPriority">{% for p in Priority %}<option value="{{ p.value }}" {{ 'selected' if p.value == 'Medium' }}>{{ p.value }}</option>{% endfor %}</select></label>
         <label class="field mb-0"><span>Due date</span><input type="date" id="ntDue"></label>
       </div>
-      <label class="field mb-0" style="margin-top:14px"><span>Assignees</span>
+      <div class="field mb-0" style="margin-top:14px"><span>Assignees</span>
         <div class="wrap" id="ntAssignees" style="gap:8px;margin-top:4px">
           {% for m in assignee_opts %}
           <label class="pick">
@@ -89,11 +87,13 @@
           </label>
           {% endfor %}
         </div>
-      </label>
+        <small class="dim">Select anyone on the team. If none are selected, this task is assigned to you.</small>
+      </div>
       <label class="field mb-0" style="margin-top:14px"><span>Files</span>
         <input type="file" id="ntFiles" multiple accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip">
         <small class="dim">Images, documents, and PDFs up to 25 MB each</small>
       </label>
+      <div id="ntError" role="alert" class="dim" style="color:var(--red);font-size:12px;margin-top:10px" hidden></div>
     </div>
     <div class="modal-f">
       <button type="button" class="btn" id="ntCancel">Cancel</button>

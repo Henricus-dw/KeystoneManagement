@@ -475,6 +475,7 @@ def project_detail(project_id: int, request: Request,
         "can_delete": user.role in (UserRole.admin, UserRole.manager),
         "can_edit": _can_edit_project(user, project),
         "can_add": _can_add_task(user, project),
+        "assignee_opts": list(db.scalars(select(User).order_by(User.name, User.id))),
         "can_upload": _can_upload_project(user, project),
     })
 
@@ -506,6 +507,7 @@ def board(request: Request, project_id: int | None = None,
     return templates.TemplateResponse(request, "board.html", {
         "user": user, "nav": "board", "projects": projects,
         "project": project, "columns": columns,
+        "assignee_opts": list(db.scalars(select(User).order_by(User.name, User.id))),
     })
 
 

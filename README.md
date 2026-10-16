@@ -110,6 +110,12 @@ Admins additionally get **Team Members** (create/list users).
 - **Projects** — list + detail with derived progress, health, team, brief, and a board snapshot.
 - **Kanban** — drag-and-drop across Todo → In Progress → Blocked → Testing → Done,
   with live progress recalculation and quick "add task".
+- **Task assignment** — when adding a task from a project or the Kanban board,
+  select one or more people from the entire team, including admins, managers,
+  and people outside the project. You are selected by default; clear your
+  selection to assign only to someone else. If nobody is selected, the task
+  is assigned to you. Assignees appear on task cards and task details and receive
+  assignment emails when Microsoft Graph is configured.
 - **Team View** — each developer's current work, blockers, and what they finished today.
 - **Daily Reports** — the stand-up replacement: Today / Tomorrow / Blocked, submitted
   by devs and shown as a team timeline.

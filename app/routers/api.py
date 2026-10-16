@@ -98,10 +98,12 @@ def create_task(payload: CreatePayload,
         except ValueError:
             due = None
 
-    # Resolve assignees; default to the creator so new cards aren't unassigned.
-    assignees = list(db.scalars(select(User).where(User.id.in_(payload.assignees)))) \
-        if payload.assignees else []
-    if not assignees:
+    # Any team member can be assigned, regardless of role or project membership.
+    if payload.assignees:
+        assignees = list(db.scalars(select(User).where(User.id.in_(payload.assignees))))
+        if {assignee.id for assignee in assignees} != set(payload.assignees):
+            return {"ok": False, "error": "One or more selected assignees no longer exist. Refresh and try again."}
+    else:
         assignees = [user]
 
     # Columns sort by Task.order ascending, so sorting below the current minimum
