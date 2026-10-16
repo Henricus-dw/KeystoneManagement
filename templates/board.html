@@ -43,7 +43,7 @@
     {% if can_add %}<button class="add-card" data-add="{{ status.value }}">+ Add task</button>{% endif %}
     <div class="col-body" data-status="{{ status.value }}">
       {% for t in columns[status] %}
-      <a class="kcard" href="/tasks/{{ t.id }}" draggable="true" data-id="{{ t.id }}">
+      <a class="kcard" href="/tasks/{{ t.id }}" draggable="{{ 'true' if t.created_by == user.id else 'false' }}" data-id="{{ t.id }}" data-editable="{{ 'true' if t.created_by == user.id else 'false' }}">
         <div class="kmeta">
           <span class="code">{{ t.code }}</span>
           {% if t.priority.value in ['High','Critical'] %}{{ badge(t.priority) }}{% endif %}

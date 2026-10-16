@@ -540,6 +540,10 @@ def task_detail(task_id: int, request: Request,
     return templates.TemplateResponse(request, "task_detail.html", {
         "user": user, "nav": "board", "task": task, "members": task.project.members,
         "can_delete_task": can_delete_task,
+        "can_edit_task": task.can_edit(user),
+        "task_statuses": list(TaskStatus),
+        "task_priorities": list(Priority),
+        "assignee_opts": list(db.scalars(select(User).order_by(User.name, User.id))),
         "can_upload_task": _can_upload_task(user, task),
     })
 

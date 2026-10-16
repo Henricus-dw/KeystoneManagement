@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, BackgroundTasks, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -36,6 +36,8 @@ def move_task(task_id: int, payload: MovePayload,
     task = db.get(Task, task_id)
     if not task:
         return {"ok": False, "error": "not found"}
+    if not task.can_edit(user):
+        return {"ok": False, "error": "Only the person who created this task can edit it."}
     new_status = _status_from(payload.status)
     if new_status is None:
         return {"ok": False, "error": "bad status"}
@@ -63,6 +65,89 @@ def move_task(task_id: int, payload: MovePayload,
         "moved": moved,
         "from": old_status.value,
     }
+
+
+class EditTaskPayload(BaseModel):
+    title: str = Field(max_length=200)
+    description: str = ""
+    notes: str = ""
+    status: str
+    priority: str
+    due_date: str | None = None
+    assignees: list[int] = Field(default_factory=list)
+
+
+@router.post("/tasks/{task_id}/edit")
+def edit_task(task_id: int, payload: EditTaskPayload,
+              background_tasks: BackgroundTasks,
+              user: User = Depends(require_user), db: Session = Depends(get_db)):
+    task = db.get(Task, task_id)
+    if not task:
+        return {"ok": False, "error": "Task not found."}
+    if not task.can_edit(user):
+        return {"ok": False, "error": "Only the person who created this task can edit it."}
+    title = payload.title.strip()
+    if not title:
+        return {"ok": False, "error": "Task title is required."}
+
+    status = _status_from(payload.status)
+    priority = next((p for p in Priority if p.value == payload.priority), None)
+    if status is None or priority is None:
+        return {"ok": False, "error": "Select a valid status and priority."}
+
+    due = None
+    if payload.due_date:
+        try:
+            due = date.fromisoformat(payload.due_date)
+        except ValueError:
+            return {"ok": False, "error": "Enter a valid due date."}
+
+    assignee_ids = set(payload.assignees)
+    assignees = list(db.scalars(select(User).where(User.id.in_(assignee_ids)))) if assignee_ids else []
+    if {assignee.id for assignee in assignees} != assignee_ids:
+        return {"ok": False, "error": "One or more selected assignees no longer exist. Refresh and try again."}
+
+    previous_assignee_ids = {assignee.id for assignee in task.assignees}
+    old_status = task.status
+    task.title = title
+    task.description = payload.description.strip()
+    task.notes = payload.notes.strip()
+    task.status = status
+    task.priority = priority
+    task.due_date = due
+    task.assignees = assignees
+    if old_status != status:
+        min_order = db.scalar(
+            select(func.coalesce(func.min(Task.order), 0)).where(
+                Task.project_id == task.project_id, Task.status == status
+            )
+        )
+        task.order = (min_order or 0) - 1
+        log_activity(db, user=user, verb="moved",
+                     summary=f'moved "{task.title}" to {status.value}',
+                     project=task.project, task=task)
+        if status == TaskStatus.done:
+            log_activity(db, user=user, verb="completed",
+                         summary=f'completed "{task.title}"', project=task.project, task=task)
+        recompute_health(task.project)
+    else:
+        log_activity(db, user=user, verb="edited",
+                     summary=f'updated "{task.title}"', project=task.project, task=task)
+    db.commit()
+    for assignee in assignees:
+        if assignee.id not in previous_assignee_ids:
+            background_tasks.add_task(
+                send_task_assignment_email,
+                recipient=assignee.email,
+                recipient_name=assignee.name,
+                task_id=task.id,
+                task_title=task.title,
+                project_name=task.project.name,
+                priority=priority.value,
+                due_date=due.strftime("%d %b %Y") if due else "Not set",
+                assigned_by=user.name,
+            )
+    return {"ok": True}
 
 
 class CreatePayload(BaseModel):
@@ -116,8 +201,10 @@ def create_task(payload: CreatePayload,
     )
     task = Task(project_id=project.id, title=payload.title.strip(),
                 status=status, priority=priority, due_date=due,
-                order=(min_order or 0) - 1, assignees=assignees)
+                order=(min_order or 0) - 1, assignees=assignees,
+                created_by=user.id)
     db.add(task)
+    db.flush()
     log_activity(db, user=user, verb="created",
                  summary=f'created task "{task.title}"', project=project, task=task)
     db.commit()

@@ -61,6 +61,61 @@ def _migrate() -> None:
                 """
             )
 
+        task_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(tasks)")]
+        if "created_by" not in task_cols:
+            conn.exec_driver_sql("ALTER TABLE tasks ADD COLUMN created_by INTEGER REFERENCES users(id)")
+        conn.exec_driver_sql(
+            """
+            UPDATE tasks SET created_by = COALESCE(
+                    (
+                        SELECT a.user_id FROM activities a
+                        WHERE a.task_id = tasks.id AND a.verb = 'created'
+                          AND a.user_id IS NOT NULL
+                        ORDER BY a.created_at ASC, a.id ASC LIMIT 1
+                    ),
+                    (
+                        SELECT a.user_id FROM activities a
+                        WHERE a.task_id IS NULL AND a.verb = 'created'
+                          AND a.project_id = tasks.project_id
+                          AND a.summary = 'created task "' || tasks.title || '"'
+                          AND a.user_id IS NOT NULL
+                          AND 1 = (
+                              SELECT COUNT(*) FROM activities matching
+                              WHERE matching.task_id IS NULL
+                                AND matching.verb = 'created'
+                                AND matching.project_id = tasks.project_id
+                                AND matching.summary =
+                                    'created task "' || tasks.title || '"'
+                                AND matching.user_id IS NOT NULL
+                          )
+                        LIMIT 1
+                    )
+            )
+            WHERE created_by IS NULL AND (
+              EXISTS (
+                  SELECT 1 FROM activities a
+                  WHERE a.task_id = tasks.id AND a.verb = 'created'
+                    AND a.user_id IS NOT NULL
+              ) OR EXISTS (
+                    SELECT 1 FROM activities a
+                    WHERE a.task_id IS NULL AND a.verb = 'created'
+                      AND a.project_id = tasks.project_id
+                      AND a.summary = 'created task "' || tasks.title || '"'
+                      AND a.user_id IS NOT NULL
+                      AND 1 = (
+                          SELECT COUNT(*) FROM activities matching
+                          WHERE matching.task_id IS NULL
+                            AND matching.verb = 'created'
+                            AND matching.project_id = tasks.project_id
+                            AND matching.summary =
+                                'created task "' || tasks.title || '"'
+                            AND matching.user_id IS NOT NULL
+                      )
+                )
+              )
+            """
+        )
+
         # servers.image -- added when server blocks gained a cover image.
         tables = [r[0] for r in conn.exec_driver_sql(
             "SELECT name FROM sqlite_master WHERE type='table'")]

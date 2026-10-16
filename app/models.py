@@ -223,10 +223,12 @@ class Task(Base):
     notes: Mapped[str] = mapped_column(Text, default="")  # PDF: "Add notes option"
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     order: Mapped[int] = mapped_column(Integer, default=0)  # position within a column
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
     project: Mapped[Project] = relationship(back_populates="tasks")
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
     assignees: Mapped[list[User]] = relationship(
         secondary=task_assignees, back_populates="tasks"
     )
@@ -240,6 +242,9 @@ class Task(Base):
     @property
     def code(self) -> str:
         return f"KS-{self.id:04d}"
+
+    def can_edit(self, user: User) -> bool:
+        return self.created_by == user.id
 
 
 class Comment(Base):

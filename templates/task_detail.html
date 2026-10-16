@@ -7,7 +7,10 @@
 {% block head %}
 <style>
   .task-status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:10px; }
-  .task-status-row select { width:auto; min-width:140px; padding-top:7px; padding-bottom:7px; }
+  .task-edit-form { display:grid; gap:12px; margin-top:12px; }
+  .task-edit-form textarea { min-height:72px; }
+  .task-assignees { display:grid; gap:7px; max-height:180px; overflow:auto; }
+  .task-assignee-option { display:flex; align-items:center; gap:8px; font-size:13px; }
   .task-files { margin-bottom:18px; }
   .task-file-upload { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-bottom:14px; margin-bottom:4px; border-bottom:1px solid var(--line-soft); }
   .task-file-upload input[type="file"] { max-width:100%; }
@@ -89,12 +92,7 @@
       <span class="dim mono" style="font-size:11px;letter-spacing:.1em">{{ label }}</span><span>{{ value|safe }}</span>
     </div>
     {% endmacro %}
-    <div class="task-status-row">
-      <span class="dim mono" style="font-size:11px;letter-spacing:.1em">STATUS</span>
-      <select id="taskStatus" aria-label="Task status">
-        {% for status in TASK_COLUMNS %}<option value="{{ status.value }}" {{ 'selected' if status == task.status }}>{{ status.value }}</option>{% endfor %}
-      </select>
-    </div>
+    {{ row('STATUS', badge(task.status)) }}
     {{ row('PRIORITY', badge(task.priority)) }}
     {{ row('PROJECT', '<a href="/projects/%s">%s</a>'|format(task.project_id, task.project.name)) }}
     {{ row('DUE', task.due_date|shortdate) }}
@@ -103,6 +101,39 @@
       <span class="dim mono" style="font-size:11px;letter-spacing:.1em">ASSIGNED</span>{{ stack(task.assignees, 4) }}
     </div>
     {% if not task.assignees %}<div class="dim" style="font-size:12px;text-align:right">Unassigned</div>{% endif %}
+
+    {% if not task.created_by %}
+    <p class="dim" style="font-size:12px;margin-top:14px">This task is read-only because its creator was not recorded.</p>
+    {% elif not can_edit_task %}
+    <p class="dim" style="font-size:12px;margin-top:14px">Only the person who created this task can edit its details.</p>
+    {% endif %}
+
+    {% if can_edit_task %}
+    <details style="margin-top:16px;border-top:1px solid var(--line-soft);padding-top:14px">
+      <summary class="btn sm" style="width:100%">Edit task…</summary>
+      <form id="taskEditForm" class="task-edit-form">
+        <label class="field mb-0"><span>Title</span><input name="title" maxlength="200" required value="{{ task.title }}"></label>
+        <label class="field mb-0"><span>Description</span><textarea name="description">{{ task.description }}</textarea></label>
+        <label class="field mb-0"><span>Notes</span><textarea name="notes">{{ task.notes }}</textarea></label>
+        <label class="field mb-0"><span>Status</span>
+          <select name="status">{% for status in task_statuses %}<option value="{{ status.value }}" {{ 'selected' if status == task.status }}>{{ status.value }}</option>{% endfor %}</select>
+        </label>
+        <label class="field mb-0"><span>Priority</span>
+          <select name="priority">{% for priority in task_priorities %}<option value="{{ priority.value }}" {{ 'selected' if priority == task.priority }}>{{ priority.value }}</option>{% endfor %}</select>
+        </label>
+        <label class="field mb-0"><span>Due date</span><input name="due_date" type="date" value="{{ task.due_date.isoformat() if task.due_date else '' }}"></label>
+        <fieldset class="field mb-0" style="border:0;padding:0;margin:0"><legend>Assignees</legend>
+          <div class="task-assignees">
+            {% for member in assignee_opts %}
+            <label class="task-assignee-option"><input type="checkbox" name="assignees" value="{{ member.id }}" {{ 'checked' if member in task.assignees }}> {{ member.name }}</label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div id="taskEditError" class="notice" role="alert" hidden style="border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red)"></div>
+        <button class="btn primary sm" type="submit">Save changes</button>
+      </form>
+    </details>
+    {% endif %}
 
     {% if can_delete_task %}
     <div style="margin-top:16px;border-top:1px solid var(--line-soft);padding-top:14px">
@@ -120,35 +151,36 @@
     {% endif %}
   </div>
 </div>
-<div id="taskStatusError" class="notice" style="display:none;border-color:rgba(244,103,122,.4);background:rgba(244,103,122,.08);color:var(--red);margin-top:14px"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
   (function () {
-    var select = document.getElementById("taskStatus");
-    var error = document.getElementById("taskStatusError");
-    if (!select) return;
-    var previous = select.value;
-
-    select.addEventListener("change", async function () {
-      var next = select.value;
-      select.disabled = true;
-      error.style.display = "none";
+    var form = document.getElementById("taskEditForm");
+    if (!form) return;
+    var error = document.getElementById("taskEditError");
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      error.hidden = true;
+      var fields = new FormData(form);
+      var payload = Object.fromEntries(fields.entries());
+      payload.assignees = fields.getAll("assignees").map(Number);
       try {
-        var response = await fetch("/api/tasks/{{ task.id }}/move", {
+        var response = await fetch("/api/tasks/{{ task.id }}/edit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: next })
+          body: JSON.stringify(payload)
         });
         var data = await response.json();
-        if (!data.ok) throw new Error(data.error || "Status could not be changed.");
+        if (!response.ok || !data.ok) throw new Error(data.error || "Task could not be updated.");
         window.location.reload();
       } catch (err) {
-        select.value = previous;
-        select.disabled = false;
         error.textContent = err.message;
-        error.style.display = "block";
+        error.hidden = false;
+      } finally {
+        button.disabled = false;
       }
     });
   })();

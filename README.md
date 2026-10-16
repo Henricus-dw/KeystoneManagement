@@ -115,7 +115,8 @@ Admins additionally get **Team Members** (create/list users).
   and people outside the project. You are selected by default; clear your
   selection to assign only to someone else. If nobody is selected, the task
   is assigned to you. Assignees appear on task cards and task details and receive
-  assignment emails when Microsoft Graph is configured.
+  assignment emails when Microsoft Graph is configured. Only the person who
+  created/assigned a task can change its details or move it between statuses.
 - **Team View** — each developer's current work, blockers, and what they finished today.
 - **Daily Reports** — the stand-up replacement: Today / Tomorrow / Blocked, submitted
   by devs and shown as a team timeline.

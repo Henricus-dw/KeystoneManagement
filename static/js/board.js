@@ -23,7 +23,10 @@
   // ---- drag handlers ----
   board.addEventListener("dragstart", (e) => {
     const card = e.target.closest(".kcard");
-    if (!card) return;
+    if (!card || card.dataset.editable !== "true") {
+      e.preventDefault();
+      return;
+    }
     dragged = card;
     card.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
