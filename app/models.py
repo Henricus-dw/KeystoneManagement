@@ -19,6 +19,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    BigInteger,
     Column,
     Date,
     DateTime,
@@ -28,6 +29,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -449,3 +451,36 @@ class ChangelogChange(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
 
     release: Mapped[ChangelogRelease] = relationship(back_populates="changes")
+
+
+class BackupRun(Base):
+    __tablename__ = "backup_runs"
+    __table_args__ = (UniqueConstraint("platform", "run_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    platform: Mapped[str] = mapped_column(String(20), index=True)
+    run_id: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(20))
+    started_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    expected_completion_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_scheduled_at: Mapped[datetime] = mapped_column(DateTime)
+    overdue_at: Mapped[datetime] = mapped_column(DateTime)
+    destination: Mapped[str] = mapped_column(String(200))
+    processed_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    repository_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    error: Mapped[str] = mapped_column(Text, default="")
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class BackupCheck(Base):
+    __tablename__ = "backup_checks"
+    __table_args__ = (UniqueConstraint("platform", "check_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    platform: Mapped[str] = mapped_column(String(20), index=True)
+    check_id: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(20))
+    checked_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    error: Mapped[str] = mapped_column(Text, default="")
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

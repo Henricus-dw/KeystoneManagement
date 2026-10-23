@@ -67,6 +67,157 @@ four have submitted. Clicking Send emails the workbook to the configured
 recipient and CCs all four members. At 12:00 SAST on the due date, missing
 members receive a reminder from the notification mailbox.
 
+### Backup monitoring
+
+**Infrastructure > Backups** (`/backups`) is a read-only view available to every
+signed-in user. It shows E-Learning, Insight, Moodle LMS and AsimoLog, with
+current status, last completion and last success, processed/repository bytes,
+destination, next scheduled time, and independent repository integrity checks.
+Expand each platform for the latest 20 runs and 20 checks; older records remain
+in the database. All displayed times are **SAST (UTC+02:00)**. Use **Refresh
+statuses** to retrieve a fresh snapshot. `GET /api/backups` returns the same
+snapshot as JSON and requires a Keystone login.
+
+The existing Restic jobs and systemd timers are **not changed or run by
+Keystone**. No SSH access, restore, delete, or backup execution is added. New
+tables are created automatically on application startup, including in existing
+databases. No reports or successful demo backups are seeded: platforms start
+as **Unknown** until their existing jobs are connected to the reporting API.
+
+#### 1. Configure reporting tokens
+
+Set four distinct, randomly generated tokens (at least 32 ASCII characters) in
+Keystone's service environment, then restart Keystone:
+
+| Platform key | Keystone environment variable |
+| --- | --- |
+| `e-learning` | `KEYSTONE_BACKUP_TOKEN_E_LEARNING` |
+| `insight` | `KEYSTONE_BACKUP_TOKEN_INSIGHT` |
+| `moodle` | `KEYSTONE_BACKUP_TOKEN_MOODLE` |
+| `asimolog` | `KEYSTONE_BACKUP_TOKEN_ASIMOLOG` |
+
+Generate each token separately with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+Deliver only the matching platform's token to its reporting job (including
+separate tokens for E-Learning and Insight on the same host). Store tokens in
+restricted service/environment files, not source control or log output.
+Rotate a token by replacing it on Keystone and the reporting host, then
+restarting the affected services. Reporting returns **503** for a missing,
+short, non-ASCII or reused platform token, **401** for an invalid bearer token,
+**404** for an unknown platform, **422** for invalid reports, and **409** for
+conflicting reuse of a report ID.
+
+Use the existing **HTTPS** reverse proxy, with certificate verification enabled.
+The reporting API is bearer-authenticated, not session-authenticated; a
+Keystone login alone cannot submit reports. Do not expose plain HTTP ingestion
+outside localhost. The proxy should limit request bodies (for example to
+16 KiB) and apply an appropriate reporting rate limit.
+
+#### 2. Connect each existing backup job
+
+Send JSON to `POST /api/backups/{platform}/reports`, authenticated with
+`Authorization: Bearer <that-platform-token>`. For example, this is a
+**payload shape**, not a statement of the production schedules or results:
+
+```json
+{
+  "run_id": "2026-10-23T01:30:00Z",
+  "status": "successful",
+  "started_at": "2026-10-23T01:30:00Z",
+  "completed_at": "2026-10-23T01:45:00Z",
+  "next_scheduled_at": "2026-10-24T01:30:00Z",
+  "overdue_at": "2026-10-24T03:30:00Z",
+  "destination": "AsimoLog physical server",
+  "processed_bytes": 123456789,
+  "repository_bytes": 987654321
+}
+```
+
+- Use a unique `run_id` per invocation, reused for its running/final reports and
+  network retries. IDs allow letters, digits, `_`, `.`, `:`, and `-` (120
+  characters maximum). A Restic snapshot ID alone is unsuitable because failed
+  runs may not produce a snapshot.
+- At job start send `status: "running"`, omit `completed_at`, and supply
+  `expected_completion_at`: the deadline after which this run is considered
+  stalled. At completion send `successful` or `failed` with `completed_at`.
+  A failed run requires a sanitized `error` (maximum 4,000 characters).
+  Report nonzero Restic exits, including partial/incomplete backups, as failed.
+- Timestamps must include an offset (`Z` or `+02:00`); Keystone normalizes them
+  to UTC. Run start and completion cannot be more than five minutes in the
+  future. Keep the hosts' clocks synchronized.
+- Read `next_scheduled_at` from the **actual systemd timer**, for example using
+  `systemctl show <existing-backup>.timer --property=NextElapseUSecRealtime --value`,
+  and convert it to ISO 8601 with an offset. Configure `overdue_at` as that
+  next run's expected completion/report deadline. Keystone does not assume
+  daily schedules or use the illustrative screenshot's times.
+- If the timer has no next run, fix/confirm the server's timer configuration
+  before reporting: the API requires explicit next-run/deadline times rather
+  than silently inventing a schedule. At initial rollout, report the last
+  **known actual** result with its current next-run/deadline, or wait for the
+  next real run; never invent a successful result.
+- Set `destination` to a safe display name, not a credential-bearing Restic
+  URL. Use AsimoLog physical server for E-Learning, Insight and Moodle, and
+  E-Learning server for AsimoLog, after verifying the current configuration.
+- Byte counts are optional nonnegative integers. `processed_bytes` is the
+  logical data processed for that run (for example Restic summary
+  `total_bytes_processed`). `repository_bytes` is actual repository storage
+  usage measured on the destination, **not** logical snapshot size or newly
+  added bytes. Omit unavailable metrics; the UI says **Not reported**, not zero.
+
+Example submission from the reporting host, after constructing an actual
+`backup-report.json` and configuring the restricted curl config described below:
+
+```bash
+curl --fail-with-body --silent --show-error \
+  --connect-timeout 5 --max-time 15 \
+  --config /etc/keystone-backup-curl.conf \
+  --header "Content-Type: application/json" \
+  --data-binary @backup-report.json \
+  "https://keystone.professionalgroup.co.za/api/backups/e-learning/reports"
+```
+
+The restricted curl config (mode `0600`, owned by the reporting service user)
+contains `header = "Authorization: Bearer <that-platform-token>"`. Do not put
+tokens on the command line, enable shell tracing, or log request headers.
+Do not send Restic passwords, SSH keys, database credentials, raw connection
+strings or unredacted command output. Unknown JSON fields are rejected.
+
+Preserve the original backup command's exit status **before reporting**. Handle
+reporting/network failures separately: log a sanitized monitoring error and
+queue the unchanged payload for retry, then exit with the **original backup
+exit status**. In particular, handle failures explicitly under shell `set -e`;
+failed reporting must not turn a successful Restic job into a failed job.
+Retrying an identical report is idempotent. A run can advance from Running to
+a final result but a final result is immutable; delayed reports cannot replace
+a newer run in the dashboard. Do not let a failed start-report submission stop
+the backup itself.
+
+#### 3. Report integrity checks separately
+
+Only after an existing `restic check` completes, send its actual result to
+`POST /api/backups/{platform}/checks` with the same platform token:
+
+```json
+{
+  "check_id": "check-2026-10-23T04:00:00Z",
+  "status": "passed",
+  "checked_at": "2026-10-23T04:20:00Z"
+}
+```
+
+Use `status: "failed"` plus a sanitized `error` on failure. A check ID is unique
+and immutable per platform; identical retries are accepted. The page displays
+the latest check timestamp and result independently of the backup result,
+without assuming check frequency or marking old checks as fresh.
+
+**Status rules:** no run reports means Unknown. A reported run is Running,
+Successful or Failed. A running job becomes Overdue strictly after its
+`expected_completion_at`; a successful platform becomes Overdue strictly after
+its `overdue_at` if no newer run has arrived. A failed run remains Failed
+until a newer run arrives, so a missed window cannot conceal an explicit
+failure. History keeps original results, not derived Overdue labels.
+Missing reports are detectable only after the first valid run/schedule report.
+Notifications and email alerts are not part of this version.
+
 ### Demo logins (password is `keystone` for everyone)
 
 | Email                        | Role      |

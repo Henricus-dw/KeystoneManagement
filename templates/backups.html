@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Backups{% endblock %}
+{% block body_class %} backups-page{% endblock %}
+{% block kicker %}Infrastructure / IT Operations{% endblock %}
+{% block heading %}Backup Monitoring{% endblock %}
+{% block topbar_actions %}<a class="btn" href="/backups">Refresh statuses</a>{% endblock %}
+{% block head %}
+<style>
+  .backup-summary { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:16px; margin-bottom:22px; }
+  .backup-table-wrap { overflow-x:auto; }
+  .backup-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .backup-table th, .backup-table td { padding:14px 12px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; }
+  .backup-table th { font-family:var(--mono); color:var(--muted); font-weight:500; white-space:nowrap; }
+  .backup-table small { display:block; color:var(--muted); margin-top:6px; }
+  .backup-status { display:inline-block; padding:4px 9px; border-radius:20px; font-size:12px; font-weight:600; white-space:nowrap; background:rgba(128,128,128,.12); color:var(--muted); }
+  .backup-status.successful, .backup-status.passed { color:var(--teal-2); background:rgba(63,224,194,.12); }
+  .backup-status.failed { color:var(--red); background:rgba(244,103,122,.12); }
+  .backup-status.running { color:var(--teal); background:rgba(28,196,216,.12); }
+  .backup-status.overdue { color:var(--gold); background:rgba(224,178,60,.12); }
+  .backup-history { margin-top:18px; }
+  .backup-history summary { cursor:pointer; font-family:var(--mono); padding:4px 0; }
+  .backup-error { color:var(--red); white-space:pre-wrap; overflow-wrap:anywhere; max-width:440px; }
+  .backup-note { font-size:13px; color:var(--muted); margin:12px 0 20px; }
+  .backup-table time { white-space:nowrap; }
+  @media(max-width:1100px) { .backup-summary { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+  @media(max-width:900px) {
+    .backups-page .shell { grid-template-columns:minmax(0,1fr); }
+    .backups-page .sidebar { position:static; height:auto; min-width:0; }
+    .backups-page .nav { flex-direction:row; overflow-x:auto; padding-bottom:6px; }
+    .backups-page .nav a { flex:0 0 auto; }
+    .backups-page .nav-label { display:none; }
+    .backups-page .sidebar .me { margin-top:12px; }
+    .backups-page .topbar { flex-wrap:wrap; padding:16px; }
+    .backups-page .topbar .spacer { display:none; }
+    .backups-page .topbar .page-title { flex:1 1 200px; }
+    .backups-page .content { padding:20px 16px; }
+  }
+  @media(max-width:600px) { .backup-summary { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+</style>
+{% endblock %}
+{% macro status_badge(status) -%}
+<span class="backup-status {{ status }}">{{ status|capitalize }}</span>
+{%- endmacro %}
+{% macro timestamp(value) -%}
+{% if value %}<time datetime="{{ value }}">{{ backup_time(value) }}</time>{% else %}Not reported{% endif %}
+{%- endmacro %}
+{% block content %}
+<div class="backup-summary">
+  <div class="card pad stat"><div class="kicker">Platforms</div><div class="num">{{ platforms|length }}</div></div>
+  {% for state in ['successful', 'failed', 'running', 'overdue', 'unknown'] %}
+  <div class="card pad stat {{ 'bad' if state == 'failed' else 'warn' if state == 'overdue' else 'accent' if state == 'successful' }}">
+    <div class="kicker">{{ state|capitalize }}</div><div class="num">{{ counts[state] }}</div>
+  </div>
+  {% endfor %}
+</div>
+<section class="card pad">
+  <h2>Backup status</h2>
+  <p class="backup-note">Read-only monitoring. All times SAST (UTC+02:00). Snapshot: {{ timestamp(generated_at) }}.
+    Refresh for current statuses. Schedules and deadlines come from the existing backup servers.</p>
+  <div class="backup-table-wrap">
+    <table class="backup-table">
+      <thead><tr><th scope="col">Platform / destination</th><th scope="col">Status</th><th scope="col">Last completed backup</th><th scope="col">Size / repository usage</th><th scope="col">Next scheduled backup</th><th scope="col">Integrity check</th></tr></thead>
+      <tbody>
+      {% for platform in platforms %}
+        {% set latest = platform.latest %}
+        <tr>
+          <td><a href="#history-{{ platform.key }}"><b>{{ platform.name }}</b></a><small>To: {{ latest.destination if latest else 'Not reported' }}</small></td>
+          <td>{{ status_badge(platform.status) }}{% if platform.reason %}<small>{{ platform.reason }}</small>{% endif %}
+            {% if latest and latest.error %}<p class="backup-error">{{ latest.error }}</p>{% endif %}
+          </td>
+          <td>{{ timestamp(platform.last_completed_at) }}<small>Last successful: {{ timestamp(platform.last_successful_at) }}</small></td>
+          <td>{{ backup_size(latest.processed_bytes if latest else none) }}<small>Repository: {{ backup_size(latest.repository_bytes if latest else none) }}</small></td>
+          <td>{{ timestamp(latest.next_scheduled_at if latest else none) }}
+            {% if latest %}<small>Missing-run deadline: {{ timestamp(latest.overdue_at) }}</small>
+            {% if latest.status == 'running' %}<small>Expected completion: {{ timestamp(latest.expected_completion_at) }}</small>{% endif %}{% endif %}
+          </td>
+          <td>{% if platform.integrity_history %}{% set check = platform.integrity_history[0] %}
+            {{ status_badge(check.status) }}<small>{{ timestamp(check.checked_at) }}</small>
+            {% if check.error %}<p class="backup-error">{{ check.error }}</p>{% endif %}
+            {% else %}{{ status_badge('unknown') }}<small>No integrity check reported.</small>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="backup-note">Unknown is not success. A successful backup does not imply that a repository integrity check passed.
+    Failed runs remain Failed until a newer run is reported; missing runs and stalled running jobs are marked Overdue using reported deadlines.</p>
+</section>
+{% for platform in platforms %}
+<details class="card pad backup-history" id="history-{{ platform.key }}">
+  <summary>{{ platform.name }} &mdash; backup history (latest {{ platform.history|length }} runs)</summary>
+  {% if platform.history %}
+  <div class="backup-table-wrap">
+    <table class="backup-table">
+      <thead><tr><th scope="col">Run / destination</th><th scope="col">Result</th><th scope="col">Started</th><th scope="col">Completed</th><th scope="col">Processed / repository</th><th scope="col">Error</th></tr></thead>
+      <tbody>{% for run in platform.history %}
+        <tr><td>{{ run.run_id }}<small>{{ run.destination }}</small></td><td>{{ status_badge(run.status) }}</td>
+          <td>{{ timestamp(run.started_at) }}</td><td>{{ timestamp(run.completed_at) }}</td>
+          <td>{{ backup_size(run.processed_bytes) }}<small>{{ backup_size(run.repository_bytes) }}</small></td>
+          <td class="backup-error">{{ run.error or 'None' }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  {% else %}<p class="backup-note">No reports received. The existing backup job must send status reports before results can appear here.</p>{% endif %}
+  <h3>Repository integrity history</h3>
+  {% if platform.integrity_history %}
+  <div class="backup-table-wrap">
+    <table class="backup-table">
+      <thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">Checked</th><th scope="col">Error</th></tr></thead>
+      <tbody>{% for check in platform.integrity_history %}
+        <tr><td>{{ check.check_id }}</td><td>{{ status_badge(check.status) }}</td><td>{{ timestamp(check.checked_at) }}</td><td class="backup-error">{{ check.error or 'None' }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  {% else %}<p class="backup-note">No repository integrity checks reported.</p>{% endif %}
+</details>
+{% endfor %}
+{% endblock %}

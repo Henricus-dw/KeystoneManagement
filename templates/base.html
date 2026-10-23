@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/static/css/keystone.css?v={{ asset_ver('css/keystone.css') }}" />
   {% block head %}{% endblock %}
 </head>
-<body class="app">
+<body class="app{% block body_class %}{% endblock %}">
   <div class="shell">
     {% include "partials/sidebar.html" %}
     <div class="main">
