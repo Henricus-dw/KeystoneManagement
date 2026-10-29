@@ -86,10 +86,8 @@
 <p class="backup-note">Server backups and Backblaze B2 backups are monitored independently. Server-stored backups already exist;
   their results and contents appear here once reported by the backup scripts. Backblaze B2 is still being configured until reports arrive.</p>
 {% endif %}
-<p class="backup-note">Backup contents list the files, directories or databases reported by each job, not a live storage scan.
-  Not reported means the script has not supplied that information. Unknown and Pending configuration do not mean success.
-  A successful backup does not imply a passed integrity check. Missing or stalled runs are Overdue using the reported deadlines;
-  failed runs remain Failed until a newer run is reported.</p>
+<p class="backup-note">Backup contents list the files, directories or databases reported by each job.
+  Not reported means the script has not supplied that information. Failed runs remain Failed until a newer run is reported.</p>
 {% for platform in platforms %}
 <section class="card pad backup-platform" aria-labelledby="platform-{{ platform.key }}">
   <h2 id="platform-{{ platform.key }}">{{ platform.name }}</h2>
