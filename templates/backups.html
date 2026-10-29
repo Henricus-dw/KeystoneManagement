@@ -65,8 +65,12 @@
 {%- endmacro %}
 {% block content %}
 <nav class="backup-tabs" aria-label="Backup pages">
+  {% if can_access_page(user, 'backups-learning') %}
   <a class="btn" href="/backups/learning"{% if group == 'learning' %} aria-current="page"{% endif %}>E-Learning &amp; Moodle</a>
+  {% endif %}
+  {% if can_access_page(user, 'backups-apps') %}
   <a class="btn" href="/backups/apps"{% if group == 'apps' %} aria-current="page"{% endif %}>Other apps</a>
+  {% endif %}
 </nav>
 <div class="backup-summary">
   <div class="card pad stat"><div class="kicker">Platforms</div><div class="num">{{ platforms|length }}</div></div>

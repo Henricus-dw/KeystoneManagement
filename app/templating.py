@@ -2,6 +2,7 @@
 from datetime import date, datetime, timezone
 
 from fastapi.templating import Jinja2Templates
+from app.access import GUEST_PAGES, can_access_page, landing_page
 
 from app.changelog import latest_version
 from app.config import APP_NAME, APP_TAGLINE, STATIC_DIR, TEMPLATES_DIR
@@ -93,6 +94,9 @@ def _asset_ver(filename: str) -> str:
 templates.env.globals["asset_ver"] = _asset_ver
 
 templates.env.globals.update(
+    can_access_page=can_access_page,
+    landing_page=landing_page,
+    guest_page_options=GUEST_PAGES,
     APP_NAME=APP_NAME,
     APP_TAGLINE=APP_TAGLINE,
     # A function, called on each render rather than fixed at startup, so a

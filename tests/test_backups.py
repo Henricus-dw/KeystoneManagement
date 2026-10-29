@@ -127,6 +127,7 @@ class BackupTests(unittest.TestCase):
     def test_all_signed_in_users_can_read_page_and_api(self):
         for role in UserRole:
             self.user.role = role
+            self.user.guest_pages = ["backups-learning", "backups-apps"] if role == UserRole.guest else []
             self.db.commit()
             for path in ("/backups/learning", "/backups/apps", "/api/backups"):
                 status, headers, body = self.http(path, signed_in=True)

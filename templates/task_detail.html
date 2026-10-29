@@ -76,11 +76,13 @@
       </div>
       {% else %}<div class="dim" style="padding:6px 0">No comments yet — start the discussion.</div>{% endfor %}
 
+      {% if user.role != UserRole.guest %}
       <form method="post" action="/tasks/{{ task.id }}/comment" style="margin-top:16px;display:flex;gap:10px;align-items:flex-start">
         {{ avatar(user, 'sm') }}
         <textarea name="body" required placeholder="Add a comment… use @name to mention" style="min-height:46px"></textarea>
         <button class="btn primary sm" type="submit" style="align-self:stretch">Send</button>
       </form>
+      {% endif %}
     </div>
   </div>
 

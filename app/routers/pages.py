@@ -13,6 +13,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import HOURS_REPORT_RECIPIENT, HOURS_REPORTS_DIR, PROJECT_UPLOADS_DIR, TASK_UPLOADS_DIR
+from app.access import GuestPage
 from app.db import get_db
 from app.deps import require_admin, require_manager, require_user
 from app.hours import (
@@ -112,8 +113,9 @@ def dashboard(request: Request, user: User = Depends(require_user), db: Session 
     total_tasks = db.scalar(select(func.count(Task.id))) or 0
     done_tasks = db.scalar(select(func.count(Task.id)).where(Task.status == TaskStatus.done)) or 0
     blocked_tasks = db.scalar(select(func.count(Task.id)).where(Task.status == TaskStatus.blocked)) or 0
-    # Count the working team (exclude the admin role).
-    team_count = db.scalar(select(func.count(User.id)).where(User.role != UserRole.admin)) or 0
+    # Guests are viewers, not part of the working team.
+    team_count = db.scalar(select(func.count(User.id)).where(
+        User.role.not_in((UserRole.admin, UserRole.guest)))) or 0
 
     return templates.TemplateResponse(request, "dashboard.html", {
         "user": user,
@@ -258,7 +260,7 @@ def _can_add_task(user: User, project: Project) -> bool:
 
 
 def _can_upload_project(user: User, project: Project) -> bool:
-    return _can_edit_project(user, project) or user in project.members
+    return user.role != UserRole.guest and (_can_edit_project(user, project) or user in project.members)
 
 
 def _project_file_path(attachment: ProjectAttachment) -> Path | None:
@@ -278,7 +280,7 @@ def _task_file_path(attachment: Attachment) -> Path | None:
 
 
 def _can_upload_task(user: User, task: Task) -> bool:
-    return (
+    return user.role != UserRole.guest and (
         user.role in (UserRole.admin, UserRole.manager, UserRole.developer)
         or user in task.project.members
         or user in task.assignees
@@ -536,7 +538,8 @@ def task_detail(task_id: int, request: Request,
     task = db.get(Task, task_id)
     if not task:
         return RedirectResponse("/board", status_code=303)
-    can_delete_task = user.role in (UserRole.admin, UserRole.manager) or user in task.assignees
+    can_delete_task = user.role != UserRole.guest and (
+        user.role in (UserRole.admin, UserRole.manager) or user in task.assignees)
     return templates.TemplateResponse(request, "task_detail.html", {
         "user": user, "nav": "board", "task": task, "members": task.project.members,
         "can_delete_task": can_delete_task,
@@ -597,7 +600,7 @@ def download_task_attachment(
     if not attachment or attachment.task_id != task_id:
         return RedirectResponse(f"/tasks/{task_id}", status_code=303)
     task = db.get(Task, task_id)
-    if not task or not _can_upload_task(user, task):
+    if not task or (user.role != UserRole.guest and not _can_upload_task(user, task)):
         return Response(status_code=404)
     path = _task_file_path(attachment)
     if not path:
@@ -834,7 +837,8 @@ def hours_tracker(
         report_month = active_month
     if month and report_month < active_month:
         return RedirectResponse(f"/hours-tracker?month={active_month:%Y-%m}", status_code=303)
-    cycle = _ensure_hours_workbook(db, report_month)
+    cycle = (db.get(MonthlyHoursCycle, report_month) if user.role == UserRole.guest
+             else _ensure_hours_workbook(db, report_month))
     month_submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == report_month
     ).options(selectinload(MonthlyHoursSubmission.user))))
@@ -962,7 +966,8 @@ def hours_review(
         return RedirectResponse("/hours-tracker", status_code=303)
     if month and report_month < active_month:
         return RedirectResponse(f"/hours-tracker/review?month={active_month:%Y-%m}", status_code=303)
-    cycle = _ensure_hours_workbook(db, report_month)
+    cycle = (db.get(MonthlyHoursCycle, report_month) if user.role == UserRole.guest
+             else _ensure_hours_workbook(db, report_month))
     path = _hours_cycle_path(cycle) if cycle else None
     month_submissions = list(db.scalars(select(MonthlyHoursSubmission).where(
         MonthlyHoursSubmission.report_month == report_month
@@ -1123,8 +1128,9 @@ def create_user(
     name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
-    role: str = Form("Developer"),
-    title: str = Form("Developer"),
+    role: UserRole = Form(UserRole.developer),
+    guest_pages: list[GuestPage] = Form(default=[]),
+    title: str = Form(""),
     accent: str = Form("#1CC4D8"),
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -1132,9 +1138,10 @@ def create_user(
     email = email.strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         return RedirectResponse("/admin/users?error=exists", status_code=303)
-    role_enum = next((r for r in UserRole if r.value == role), UserRole.developer)
+    role_enum = role
     new_user = User(name=name.strip(), email=email, password_hash=hash_password(password),
-                    role=role_enum, title=title.strip() or role_enum.value, accent=accent)
+                    role=role_enum, title=title.strip() or role_enum.value, accent=accent,
+                    guest_pages=list(dict.fromkeys(guest_pages)) if role_enum == UserRole.guest else [])
     db.add(new_user)
     log_activity(db, user=user, verb="created",
                  summary=f'added team member {new_user.name} ({role_enum.value})')
@@ -1147,7 +1154,8 @@ def update_user(
     user_id: int,
     name: str = Form(...),
     email: str = Form(...),
-    role: str = Form("Developer"),
+    role: UserRole = Form(UserRole.developer),
+    guest_pages: list[GuestPage] = Form(default=[]),
     title: str = Form(""),
     accent: str = Form("#1CC4D8"),
     password: str = Form(""),
@@ -1163,7 +1171,8 @@ def update_user(
         return RedirectResponse("/admin/users?error=exists", status_code=303)
     target.name = name.strip()
     target.email = email
-    target.role = next((r for r in UserRole if r.value == role), target.role)
+    target.role = role
+    target.guest_pages = list(dict.fromkeys(guest_pages)) if role == UserRole.guest else []
     target.title = title.strip() or target.role.value
     target.accent = accent
     pw_note = ""

@@ -62,14 +62,14 @@ the previous month until the 20th, then switches to the current month. The due
 date is the first working day of the following month. After the first of Henri,
 Darryl, Jean, or Taskeen submits, the consolidated workbook becomes available
 for review; each subsequent submission adds that member's worksheet. Any team
-member can review and edit the workbook, but Send remains disabled until all
+staff member can review and edit the workbook, but Send remains disabled until all
 four have submitted. Clicking Send emails the workbook to the configured
 recipient and CCs all four members. At 12:00 SAST on the due date, missing
 members receive a reminder from the notification mailbox.
 
 ### Backup monitoring
 
-Backup monitoring is read-only and available to every signed-in user through
+Backup monitoring is read-only and available to staff and explicitly permitted guests through
 two **Infrastructure** links:
 
 - **E-Learning / Moodle Backups** (`/backups/learning`) shows E-Learning and
@@ -270,6 +270,41 @@ Notifications and email alerts are not part of this version.
 | `darryl@professional.aero`   | Developer |
 
 Admins additionally get **Team Members** (create/list users).
+
+### Guest role and page access
+
+Admins can select **Guest** when creating or editing a member under
+**Team Members**, then tick that person's **Guest page access** checkboxes.
+Permissions are stored separately for each guest, not shared across the role.
+New guests have **no page grants** by default. Saving with no boxes selected
+revokes all optional page access. Changing a user away from Guest clears the
+guest grants; converting them back requires selecting pages again.
+
+- Guests have **read-only** access to selected pages. Navigation hides
+  unselected pages, and direct URLs, downloads and JSON endpoints enforce the
+  same permissions. Guests cannot create/edit/delete records, comment, upload,
+  move tasks, submit hours, edit/send workbooks or manage members.
+- Account settings (including changing their own password/avatar colour) and
+  sign-out are always available. Login opens the first allowed page in menu
+  order, or Account if no pages are selected.
+- **Projects** includes project details/files and task details/files linked
+  from those projects. **Kanban** includes task details/files. Either grant
+  enables task detail access; neither implicitly grants the other main page.
+- Each backup page has a separate grant. The backup JSON endpoint returns
+  only platforms from the granted backup page(s).
+- Analytics and Activity can be explicitly granted read-only, including the
+  Activity PDF export. Team Members and release-management forms remain
+  admin-only. Existing Admin, Manager and Developer access is unchanged.
+- The **Servers** grant includes credentials on server entries the user can
+  already view (shared entries or their own); it does not grant access to
+  another user's private entries. Grant this page only to trusted guests.
+- Hours Tracker includes read-only review of existing team workbooks. Guest
+  page visits do not create or update workbook files.
+
+Permission changes take effect on the guest's next request, without requiring
+them to sign out. Restart Keystone after deploying this change: the existing
+database gains a `guest_pages` column automatically, preserving staff roles
+and starting with empty guest grants.
 
 ---
 

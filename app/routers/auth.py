@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.access import landing_page
 from app.deps import get_current_user
 from app.models import User
 from app.security import verify_password
@@ -15,13 +16,13 @@ router = APIRouter()
 
 @router.get("/")
 def root(user: User | None = Depends(get_current_user)):
-    return RedirectResponse("/dashboard" if user else "/login", status_code=303)
+    return RedirectResponse(landing_page(user) if user else "/login", status_code=303)
 
 
 @router.get("/login")
 def login_page(request: Request, user: User | None = Depends(get_current_user)):
     if user:
-        return RedirectResponse("/dashboard", status_code=303)
+        return RedirectResponse(landing_page(user), status_code=303)
     return templates.TemplateResponse(request, "login.html", {"error": None})
 
 
@@ -44,9 +45,9 @@ def login_submit(
     request.session["user_id"] = user.id
     if wants_json:
         # The browser plays the holographic entrance, then navigates itself.
-        return JSONResponse({"ok": True, "next": "/dashboard"})
+        return JSONResponse({"ok": True, "next": landing_page(user)})
     # No-JS fallback: ?welcome=1 triggers the entrance on the dashboard instead.
-    return RedirectResponse("/dashboard?welcome=1", status_code=303)
+    return RedirectResponse(f"{landing_page(user)}?welcome=1", status_code=303)
 
 
 @router.get("/logout")

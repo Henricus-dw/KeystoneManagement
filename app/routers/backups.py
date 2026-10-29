@@ -17,6 +17,7 @@ from app.backups import (
     backup_overview, backup_size, backup_time, utc,
 )
 from app.db import get_db
+from app.access import can_access_page, guest_platforms
 from app.deps import require_user
 from app.models import BackupCheck, BackupRun, User
 from app.templating import templates
@@ -215,12 +216,13 @@ def backup_statuses(
     response: Response, user: User = Depends(require_user), db: Session = Depends(get_db),
 ):
     response.headers["Cache-Control"] = "no-store"
-    return backup_overview(db)
+    return backup_overview(db, platform_keys=guest_platforms(user))
 
 
 @router.get("/backups")
 def backups_page(user: User = Depends(require_user)):
-    return RedirectResponse("/backups/learning", status_code=303, headers={"Cache-Control": "no-store"})
+    target = "/backups/learning" if can_access_page(user, "backups-learning") else "/backups/apps"
+    return RedirectResponse(target, status_code=303, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/backups/{group}")

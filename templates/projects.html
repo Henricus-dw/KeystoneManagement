@@ -5,7 +5,7 @@
 {% block heading %}Projects{% endblock %}
 
 {% block topbar_actions %}
-<a class="btn primary sm" href="/projects/new">+ New Project</a>
+{% if user.role != UserRole.guest %}<a class="btn primary sm" href="/projects/new">+ New Project</a>{% endif %}
 {% endblock %}
 
 {% block content %}

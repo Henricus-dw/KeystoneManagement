@@ -5,7 +5,7 @@
 {% block heading %}Servers &amp; Access{% endblock %}
 
 {% block topbar_actions %}
-<a class="btn primary sm" href="/servers/new">+ New Server</a>
+{% if user.role != UserRole.guest %}<a class="btn primary sm" href="/servers/new">+ New Server</a>{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -38,14 +38,14 @@
   {% for s in mine %}{{ srv_card(s, true) }}{% endfor %}
 </div>
 {% else %}
-<div class="empty-state">You haven't saved any servers yet. <a href="/servers/new" style="color:var(--teal)">Add one →</a><br>
+<div class="empty-state">You haven't saved any servers yet. {% if user.role != UserRole.guest %}<a href="/servers/new" style="color:var(--teal)">Add one →</a>{% endif %}<br>
   <span style="font-size:12.5px">New entries are private to you until you choose to share them.</span></div>
 {% endif %}
 
 <div class="section-title" style="margin-top:34px"><h2>Shared with you</h2><div class="line"></div>
   <span class="dim mono" style="font-size:11px">{{ shared|length }}</span></div>
 {% if shared %}
-<p class="dim" style="font-size:12.5px">Shared entries can be edited or deleted by any signed-in team member.</p>
+<p class="dim" style="font-size:12.5px">Shared entries can be edited or deleted by staff. Guest access is read-only.</p>
 <div class="srv-grid">
   {% for s in shared %}{{ srv_card(s, false) }}{% endfor %}
 </div>

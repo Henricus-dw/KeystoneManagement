@@ -48,6 +48,7 @@ class UserRole(str, enum.Enum):
     admin = "Admin"
     manager = "Manager"
     developer = "Developer"
+    guest = "Guest"
 
 
 class ProjectStatus(str, enum.Enum):
@@ -138,6 +139,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(200), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.developer)
+    guest_pages: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     title: Mapped[str] = mapped_column(String(120), default="Developer")
     accent: Mapped[str] = mapped_column(String(7), default="#1CC4D8")  # avatar colour
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -247,7 +249,7 @@ class Task(Base):
         return f"KS-{self.id:04d}"
 
     def can_edit(self, user: User) -> bool:
-        return self.created_by == user.id
+        return user.role != UserRole.guest and self.created_by == user.id
 
 
 class Comment(Base):
@@ -407,12 +409,12 @@ class Server(Base):
         return self.shared or self.owner_id == user.id or user.role == UserRole.admin
 
     def can_manage(self, user: User) -> bool:
-        """Every viewer may edit or delete the entry."""
-        return self.can_view(user)
+        """Staff viewers may edit or delete the entry."""
+        return user.role != UserRole.guest and self.can_view(user)
 
     def can_share(self, user: User) -> bool:
         """Only the owner or an Admin may change visibility."""
-        return self.owner_id == user.id or user.role == UserRole.admin
+        return user.role != UserRole.guest and (self.owner_id == user.id or user.role == UserRole.admin)
 
 
 class ChangelogRelease(Base):

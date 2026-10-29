@@ -34,7 +34,7 @@
   <div class="card pad stat"><div class="kicker">Owner</div>
     <div class="row" style="gap:10px;margin-top:10px">{% if server.owner %}{{ avatar(server.owner, 'sm') }}<b style="font-family:var(--head);font-size:14px">{{ server.owner.name }}</b>{% else %}<span class="dim">Unknown</span>{% endif %}</div></div>
   <div class="card pad stat"><div class="kicker">Visibility</div>
-    <div class="sub" style="margin-top:10px">{% if server.shared %}Shared. The whole team can view, edit and delete this entry.{% else %}Private. Only the owner and admins can access this entry.{% endif %}</div></div>
+    <div class="sub" style="margin-top:10px">{% if server.shared %}Shared. Staff can view, edit and delete this entry; permitted guests can only view it.{% else %}Private. Only the owner and admins can access this entry.{% endif %}</div></div>
 </div>
 
 {% set eye_icon %}<svg class="ico ico-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ico ico-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20C5 20 1 12 1 12a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>{% endset %}

@@ -14,8 +14,12 @@
   </div>
   {% if saved %}<div class="notice success">Workbook changes saved on the server.</div>{% endif %}
   {% if sent_now %}<div class="notice success">The consolidated workbook was sent to the recipient and CC'd to all four team members.</div>{% endif %}
+  {% if user.role == UserRole.guest %}
+  <p class="dim">You can review the available worksheets. Editing and sending are restricted to staff.</p>
+  {% else %}
   <p class="dim" style="line-height:1.6">Review each submitted member's worksheet below. Click a cell to edit it; changes are saved to the server automatically. The workbook can be sent after all four members submit.</p>
   <div id="autosave-status" class="dim" style="font-size:12px;margin-bottom:12px">All changes saved</div>
+  {% endif %}
 
   {% if waiting %}
   <div class="notice">No one has submitted hours for this month yet. The review workbook will be available after the first submission.</div>
@@ -27,9 +31,11 @@
     {% endfor %}
   </div>
 
+  {% if user.role != UserRole.guest %}
   <form method="post" action="/hours-tracker/review/save" id="save-workbook-form">
     <input type="hidden" name="month" value="{{ month }}" />
     <input type="hidden" name="workbook_data" id="workbook-data" />
+  {% else %}<div>{% endif %}
     {% for sheet in sheets %}
     <section class="sheet-panel" id="sheet-{{ loop.index }}" data-sheet-title="{{ sheet.title }}" {{ 'hidden' if not loop.first }}>
       <div style="overflow-x:auto">
@@ -38,15 +44,18 @@
           {% set row_index = loop.index0 %}
           <tr>
             {% for value in row %}
-            {% if row_index == 0 %}<th>{{ value }}</th>{% else %}<td contenteditable="true">{{ value }}</td>{% endif %}
+            {% if row_index == 0 %}<th>{{ value }}</th>{% else %}<td{% if user.role != UserRole.guest %} contenteditable="true"{% endif %}>{{ value }}</td>{% endif %}
             {% endfor %}
-            {% if row_index == 0 %}<th aria-label="Actions"></th>{% else %}<td class="row-action"><button class="btn" type="button" data-delete-row title="Delete entry" aria-label="Delete entry"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3" /></svg></button></td>{% endif %}
+            {% if user.role != UserRole.guest %}
+              {% if row_index == 0 %}<th aria-label="Actions"></th>{% else %}<td class="row-action"><button class="btn" type="button" data-delete-row title="Delete entry" aria-label="Delete entry"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3" /></svg></button></td>{% endif %}
+            {% endif %}
           </tr>
           {% endfor %}
         </table>
       </div>
     </section>
     {% endfor %}
+    {% if user.role != UserRole.guest %}
     <div class="row" style="gap:10px;margin-top:18px">
       <button class="btn" type="submit">Save workbook changes</button>
     </div>
@@ -57,6 +66,7 @@
       {{ 'Workbook already sent - edit a worksheet to resend' if sent else ('Send available after all four submit' if not all_members_submitted else 'Send consolidated workbook') }}
     </button>
   </form>
+    {% else %}</div>{% endif %}
   {% endif %}
 </div>
 {% endblock %}
@@ -74,6 +84,7 @@
     panels.forEach((panel) => { panel.hidden = panel.id !== tab.dataset.tab; });
   }));
 
+  {% if user.role != UserRole.guest %}
   function collectWorkbook() {
     return Array.from(panels).map((panel) => ({
       title: panel.dataset.sheetTitle,
@@ -154,5 +165,6 @@
       }
     });
   });
+  {% endif %}
 </script>
 {% endblock %}

@@ -21,6 +21,10 @@
         {% block topbar_actions %}{% endblock %}
       </header>
       <main class="content">
+        {% if user.role == UserRole.guest %}
+        <div class="notice">Guest access is read-only. Only pages selected by your administrator are available.
+          {% if not user.guest_pages %}No pages have been granted yet. Contact your administrator for access.{% endif %}</div>
+        {% endif %}
         {% block content %}{% endblock %}
       </main>
     </div>

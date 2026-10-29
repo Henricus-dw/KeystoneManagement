@@ -40,6 +40,7 @@
 		{% if error %}
 		<div class="notice danger" id="hours-error" data-error="{{ error }}">{{ error }}</div>
 		{% endif %}
+		{% if user.role != UserRole.guest %}
 		{% set entries = entries|default([{"customer": "", "other_customer": "", "duration": "", "description": ""}]) %}
 		<form method="post" action="/hours-tracker">
 			<div id="hours-entries">
@@ -86,6 +87,7 @@
 			</label>
 			<button class="btn primary" type="submit">Submit my hours</button>
 		</form>
+		{% endif %}
 	</section>
 	<aside class="card pad">
 		<div class="kicker">Submission guide</div>
@@ -98,6 +100,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% if user.role != UserRole.guest %}
 <script>
 	const entriesContainer = document.getElementById('hours-entries');
 	const addEntryButton = document.getElementById('add-entry');
@@ -147,4 +150,5 @@
 	const errorNotice = document.getElementById('hours-error');
 	if (errorNotice?.dataset.error) alert(errorNotice.dataset.error);
 </script>
+{% endif %}
 {% endblock %}

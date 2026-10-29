@@ -48,6 +48,9 @@ def init_db() -> None:
 def _migrate() -> None:
     """Lightweight, idempotent schema migrations for existing databases."""
     with engine.begin() as conn:
+        user_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(users)")]
+        if user_cols and "guest_pages" not in user_cols:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN guest_pages JSON NOT NULL DEFAULT '[]'")
         cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(projects)")]
         if "created_by" not in cols:
             conn.exec_driver_sql("ALTER TABLE projects ADD COLUMN created_by INTEGER")
