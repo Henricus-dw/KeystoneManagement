@@ -70,11 +70,15 @@ def _destination_overview(db: Session, key: str, kind: str, now: datetime) -> di
         ).order_by(BackupRun.completed_at.desc()).limit(1)
     )
     last_success = db.scalar(
-        select(BackupRun.completed_at).where(
-            BackupRun.platform == key, BackupRun.destination_kind == kind,
-            BackupRun.status == "successful",
-        ).order_by(BackupRun.completed_at.desc()).limit(1)
-    )
+    select(BackupRun.completed_at).where(
+        BackupRun.platform == key,
+        BackupRun.destination_kind == kind,
+        BackupRun.status.in_((
+            "successful",
+            "historical_snapshot",
+        )),
+    ).order_by(BackupRun.completed_at.desc()).limit(1)
+)
     checks = list(db.scalars(
         select(BackupCheck).where(BackupCheck.platform == key, BackupCheck.destination_kind == kind)
         .order_by(BackupCheck.checked_at.desc(), BackupCheck.id.desc()).limit(HISTORY_LIMIT)
