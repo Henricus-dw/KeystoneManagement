@@ -119,12 +119,24 @@ def backup_overview(
         kinds = ("server", "b2") if key in LEARNING_PLATFORMS else ("server",)
         destinations = [_destination_overview(db, key, kind, now) for kind in kinds]
         server = destinations[0]
-        counts[server["status"]] += 1
+
+        # Map historical backup statuses for dashboard display.
+        def display_status(status):
+            if status in ("historical_snapshot", "snapshot_available"):
+                return "successful"
+            return status
+
+        counts[display_status(server["status"])] += 1
+
         for destination in destinations:
-            destination_counts[destination["status"]] += 1
+            destination_counts[display_status(destination["status"])] += 1
+
         platforms.append({
-            **{field: value for field, value in server.items() if field not in ("kind", "name")},
-            "key": key, "name": name, "destinations": destinations,
+            **{field: value for field, value in server.items()
+               if field not in ("kind", "name")},
+            "key": key,
+            "name": name,
+            "destinations": destinations,
         })
     return {
         "platforms": platforms, "counts": counts, "destination_counts": destination_counts,
