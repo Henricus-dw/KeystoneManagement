@@ -69,20 +69,39 @@ members receive a reminder from the notification mailbox.
 
 ### Backup monitoring
 
-**Infrastructure > Backups** (`/backups`) is a read-only view available to every
-signed-in user. It shows E-Learning, Insight, Moodle LMS and AsimoLog, with
+Backup monitoring is read-only and available to every signed-in user through
+two **Infrastructure** links:
+
+- **E-Learning / Moodle Backups** (`/backups/learning`) shows E-Learning and
+  Moodle LMS. Each has independent **Server backups** and **Backblaze B2**
+  sections. B2 starts as **Pending configuration**, not Successful or Failed.
+- **Other App Backups** (`/backups/apps`) shows Insight and AsimoLog server backups.
+
+The old `/backups` link redirects to `/backups/learning`. Each destination shows
 current status, last completion and last success, processed/repository bytes,
-destination, next scheduled time, and independent repository integrity checks.
-Expand each platform for the latest 20 runs and 20 checks; older records remain
-in the database. All displayed times are **SAST (UTC+02:00)**. Use **Refresh
-statuses** to retrieve a fresh snapshot. `GET /api/backups` returns the same
-snapshot as JSON and requires a Keystone login.
+storage target, next scheduled time, reported backup contents (files,
+directories or databases), and independent repository integrity checks.
+Expand each destination's history for its latest 20 runs and 20 checks; older
+records remain in the database. Page status counts count destinations, not
+platforms. All displayed times are **SAST (UTC+02:00)**. Use **Refresh statuses**
+to retrieve a fresh snapshot without leaving the current page.
+
+`GET /api/backups` requires a Keystone login and returns all four platforms.
+Each platform's `destinations` array contains independent destination snapshots.
+For compatibility, the platform-level status/history fields and top-level
+`counts` still describe **server backups only**; they are not an overall
+protection status. `destination_counts` counts all destination statuses,
+including pending B2 destinations.
 
 The existing Restic jobs and systemd timers are **not changed or run by
 Keystone**. No SSH access, restore, delete, or backup execution is added. New
-tables are created automatically on application startup, including in existing
-databases. No reports or successful demo backups are seeded: platforms start
-as **Unknown** until their existing jobs are connected to the reporting API.
+tables and schema updates are applied automatically on application startup,
+including in existing databases. Existing runs and integrity checks are
+preserved as **server** records. Existing server-stored backups are not
+automatically inspected: the backup scripts must report actual results and
+contents. No reports or successful demo backups are seeded: server backups
+start as **Unknown** until their jobs are connected to the reporting API.
+Missing file/directory information is shown as **Not reported**, not guessed.
 
 #### 1. Configure reporting tokens
 
@@ -110,7 +129,7 @@ Use the existing **HTTPS** reverse proxy, with certificate verification enabled.
 The reporting API is bearer-authenticated, not session-authenticated; a
 Keystone login alone cannot submit reports. Do not expose plain HTTP ingestion
 outside localhost. The proxy should limit request bodies (for example to
-16 KiB) and apply an appropriate reporting rate limit.
+64 KiB, allowing for the bounded contents list) and apply an appropriate reporting rate limit.
 
 #### 2. Connect each existing backup job
 
@@ -121,21 +140,37 @@ Send JSON to `POST /api/backups/{platform}/reports`, authenticated with
 ```json
 {
   "run_id": "2026-10-23T01:30:00Z",
+  "destination_kind": "server",
   "status": "successful",
   "started_at": "2026-10-23T01:30:00Z",
   "completed_at": "2026-10-23T01:45:00Z",
   "next_scheduled_at": "2026-10-24T01:30:00Z",
   "overdue_at": "2026-10-24T03:30:00Z",
   "destination": "AsimoLog physical server",
+  "contents": ["/srv/example-app", "/etc/example-app", "Database dump: /var/backups/example.sql"],
   "processed_bytes": 123456789,
   "repository_bytes": 987654321
 }
 ```
 
-- Use a unique `run_id` per invocation, reused for its running/final reports and
+- Set `destination_kind` to `server` for backups on another server or `b2`
+  for Backblaze B2. Omitting it defaults to `server`, so existing scripts
+  continue to work unchanged. B2 reporting is supported for E-Learning and
+  Moodle; B2 reports for the other apps are rejected with **422**.
+  Once B2 jobs are configured, send their reports to the same platform
+  endpoint using that platform's token, with `destination_kind: "b2"` and a
+  safe B2 target display name. No B2 credentials are stored in Keystone.
+- Use a unique `run_id` per destination and invocation, reused for its running/final reports and
   network retries. IDs allow letters, digits, `_`, `.`, `:`, and `-` (120
   characters maximum). A Restic snapshot ID alone is unsuitable because failed
   runs may not produce a snapshot.
+- Supply `contents` from the actual backup script inputs: a list of files,
+  directories and/or database dump descriptions included in that run. It is
+  stored with the run and shown in both current status and history. Use at
+  most 100 nonblank entries of at most 500 characters each; surrounding
+  whitespace is stripped. Do not include credentials, connection strings or
+  file contents. Omit the list (or send `[]`) if unknown: the page says
+  **Not reported**. Keystone does not scan storage or infer scope from old runs.
 - At job start send `status: "running"`, omit `completed_at`, and supply
   `expected_completion_at`: the deadline after which this run is considered
   stalled. At completion send `successful` or `failed` with `completed_at`.
@@ -155,7 +190,7 @@ Send JSON to `POST /api/backups/{platform}/reports`, authenticated with
   **known actual** result with its current next-run/deadline, or wait for the
   next real run; never invent a successful result.
 - Set `destination` to a safe display name, not a credential-bearing Restic
-  URL. Use AsimoLog physical server for E-Learning, Insight and Moodle, and
+  URL. For server backups, use AsimoLog physical server for E-Learning, Insight and Moodle, and
   E-Learning server for AsimoLog, after verifying the current configuration.
 - Byte counts are optional nonnegative integers. `processed_bytes` is the
   logical data processed for that run (for example Restic summary
@@ -199,19 +234,26 @@ Only after an existing `restic check` completes, send its actual result to
 ```json
 {
   "check_id": "check-2026-10-23T04:00:00Z",
+  "destination_kind": "server",
   "status": "passed",
   "checked_at": "2026-10-23T04:20:00Z"
 }
 ```
 
-Use `status: "failed"` plus a sanitized `error` on failure. A check ID is unique
-and immutable per platform; identical retries are accepted. The page displays
+Use `status: "failed"` plus a sanitized `error` on failure. Set
+`destination_kind: "b2"` for a B2 repository check; omitted means `server`.
+Run IDs and check IDs are scoped by platform **and destination kind**, so the
+same ID can be used independently for server and B2. A check ID is unique
+and immutable within that scope; identical retries are accepted. The page displays
 the latest check timestamp and result independently of the backup result,
 without assuming check frequency or marking old checks as fresh.
 
-**Status rules:** no run reports means Unknown. A reported run is Running,
+**Status rules:** no run reports means Unknown, except B2 with no run or check
+reports starts as Pending configuration. A B2 check alone changes it to Unknown,
+not Successful: an integrity check is not evidence that a backup completed.
+A reported run is Running,
 Successful or Failed. A running job becomes Overdue strictly after its
-`expected_completion_at`; a successful platform becomes Overdue strictly after
+`expected_completion_at`; a successful destination becomes Overdue strictly after
 its `overdue_at` if no newer run has arrived. A failed run remains Failed
 until a newer run arrives, so a missed window cannot conceal an explicit
 failure. History keeps original results, not derived Overdue labels.

@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from itsdangerous import TimestampSigner
 from pydantic import ValidationError
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import Column, Index, MetaData, Table, UniqueConstraint, create_engine, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from starlette.middleware.sessions import SessionMiddleware
@@ -21,6 +21,7 @@ from app.db import Base, get_db
 from app.deps import AuthRedirect
 from app.models import BackupCheck, BackupRun, User, UserRole
 from app.routers.backups import BackupReport, IntegrityReport, _stored_values, _update_run, router
+from app.seed import _migrate
 from app.templating import templates
 
 
@@ -118,7 +119,7 @@ class BackupTests(unittest.TestCase):
         self.assertTrue(all(p["latest"] is None for p in overview["platforms"]))
 
     def test_both_monitoring_routes_require_login(self):
-        for path in ("/backups", "/api/backups"):
+        for path in ("/backups", "/backups/learning", "/backups/apps", "/api/backups"):
             status, headers, _ = self.http(path)
             self.assertEqual(status, 303)
             self.assertEqual(headers[b"location"], b"/login")
@@ -127,11 +128,11 @@ class BackupTests(unittest.TestCase):
         for role in UserRole:
             self.user.role = role
             self.db.commit()
-            for path in ("/backups", "/api/backups"):
+            for path in ("/backups/learning", "/backups/apps", "/api/backups"):
                 status, headers, body = self.http(path, signed_in=True)
                 self.assertEqual(status, 200)
                 self.assertEqual(headers[b"cache-control"], b"no-store")
-                self.assertIn(b"E-Learning", body)
+                self.assertIn(b"Insight" if path == "/backups/apps" else b"E-Learning", body)
                 self.assertNotIn(self.tokens["e-learning"].encode(), body)
 
     def test_tokens_are_required_and_platform_scoped(self):
@@ -249,7 +250,7 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(platform["status"], "failed")
         self.assertEqual(platform["last_successful_at"], self.now.isoformat())
         self.assertEqual(self.overview(self.now + timedelta(days=10))["platforms"][0]["status"], "failed")
-        body = self.http("/backups", signed_in=True)[2].decode()
+        body = self.http("/backups/learning", signed_in=True)[2].decode()
         self.assertNotIn("<script>alert", body)
         self.assertIn("&lt;script&gt;", body)
 
@@ -269,6 +270,9 @@ class BackupTests(unittest.TestCase):
             {"error": "x" * 4001}, {"error": "Not a successful run"},
             {"run_id": ""}, {"run_id": "bad id"}, {"destination": "   "},
             {"restic_password": "must-not-be-accepted"},
+            {"destination_kind": "unknown"}, {"contents": "not a list"},
+            {"contents": ["   "]}, {"contents": ["x" * 501]},
+            {"contents": ["file"] * 101}, {"contents": [123]}, {"contents": None},
         ]
         for change in invalid:
             with self.subTest(change=change):
@@ -346,6 +350,185 @@ class BackupTests(unittest.TestCase):
             del values[field]
             with self.assertRaises(ValidationError):
                 BackupReport(**values)
+
+    def test_backup_pages_are_separate_and_old_link_redirects(self):
+        status, headers, _ = self.http("/backups", signed_in=True)
+        self.assertEqual(status, 303)
+        self.assertEqual(headers[b"location"], b"/backups/learning")
+        for path, present, absent in (
+            ("/backups/learning", ("e-learning", "moodle"), ("insight", "asimolog")),
+            ("/backups/apps", ("insight", "asimolog"), ("e-learning", "moodle")),
+        ):
+            status, _, body = self.http(path, signed_in=True)
+            self.assertEqual(status, 200)
+            html = body.decode()
+            for key in present:
+                self.assertIn(f'id="platform-{key}"', html)
+            for key in absent:
+                self.assertNotIn(f'id="platform-{key}"', html)
+            self.assertIn(f'href="{path}">Refresh statuses', html)
+            self.assertEqual('class="backup-status pending"' in html, path.endswith("learning"))
+        self.assertEqual(self.http("/backups/invalid", signed_in=True)[0], 422)
+
+    def test_server_and_b2_runs_are_independent_with_same_ids(self):
+        self.assertEqual(self.report()[0], 200)
+        b2 = {**self.payload, "destination_kind": "b2", "destination": "Backblaze B2 bucket",
+              "status": "failed", "error": "B2 upload failed", "contents": ["/srv/moodle"]}
+        self.assertEqual(self.report(b2)[0], 200)
+        self.assertEqual(self.report(b2)[0], 200)
+        platform = self.overview()["platforms"][0]
+        server, cloud = platform["destinations"]
+        self.assertEqual(server["status"], "successful")
+        self.assertEqual(cloud["status"], "failed")
+        self.assertEqual(platform["status"], "successful")
+        self.assertEqual(cloud["latest"]["contents"], ["/srv/moodle"])
+        self.assertEqual(cloud["latest"]["destination_kind"], "b2")
+        self.assertIsNone(cloud["last_successful_at"])
+        self.assertEqual(len(server["history"]), 1)
+        self.assertEqual(len(cloud["history"]), 1)
+        self.assertEqual(self.db.scalar(select(func.count(BackupRun.id))), 2)
+        self.assertEqual(self.report({**b2, "status": "successful", "error": ""})[0], 409)
+        html = self.http("/backups/learning", signed_in=True)[2].decode()
+        self.assertIn("B2 upload failed", html)
+        api = json.loads(self.http("/api/backups", signed_in=True)[2])
+        self.assertEqual(api["platforms"][0]["destinations"][1]["status"], "failed")
+
+    def test_b2_can_run_finish_and_become_overdue_independently(self):
+        self.report()
+        deadline = self.now + timedelta(hours=1)
+        b2 = {**self.payload, "destination_kind": "b2", "status": "running",
+              "completed_at": None, "expected_completion_at": deadline.isoformat()}
+        self.assertEqual(self.report(b2)[0], 200)
+        self.assertEqual(self.overview(deadline)["platforms"][0]["destinations"][1]["status"], "running")
+        destinations = self.overview(deadline + timedelta(seconds=1))["platforms"][0]["destinations"]
+        self.assertEqual([d["status"] for d in destinations], ["successful", "overdue"])
+        final = {**self.payload, "destination_kind": "b2",
+                 "next_scheduled_at": deadline.isoformat(), "overdue_at": deadline.isoformat()}
+        self.assertEqual(self.report(final)[0], 200)
+        self.assertEqual(self.overview(deadline)["platforms"][0]["destinations"][1]["status"], "successful")
+        self.assertEqual(self.overview(deadline + timedelta(seconds=1))["platforms"][0]["destinations"][1]["status"], "overdue")
+
+    def test_page_summaries_only_count_their_platforms_and_destinations(self):
+        self.report()
+        self.report(platform="insight")
+        learning = backup_overview(self.db, self.now, platform_keys=("e-learning", "moodle"))
+        apps = backup_overview(self.db, self.now, platform_keys=("insight", "asimolog"))
+        self.assertEqual([p["key"] for p in learning["platforms"]], ["e-learning", "moodle"])
+        self.assertEqual([p["key"] for p in apps["platforms"]], ["insight", "asimolog"])
+        self.assertEqual(sum(learning["destination_counts"].values()), 4)
+        self.assertEqual(learning["destination_counts"]["pending"], 2)
+        self.assertEqual(learning["destination_counts"]["successful"], 1)
+        self.assertEqual(sum(apps["destination_counts"].values()), 2)
+        self.assertEqual(apps["destination_counts"]["pending"], 0)
+        self.assertEqual(apps["destination_counts"]["successful"], 1)
+
+    def test_b2_history_limit_and_old_last_success_are_destination_scoped(self):
+        self.report()
+        self.assertEqual(self.report({**self.payload, "destination_kind": "b2"})[0], 200)
+        for index in range(HISTORY_LIMIT + 1):
+            payload = {**self.payload, "destination_kind": "b2", "run_id": f"b2-failure-{index}",
+                       "status": "failed", "error": "B2 failed",
+                       "started_at": (self.now + timedelta(seconds=index)).isoformat(),
+                       "completed_at": (self.now + timedelta(seconds=index)).isoformat()}
+            self.assertEqual(self.report(payload)[0], 200)
+        server, cloud = self.overview(self.now + timedelta(minutes=1))["platforms"][0]["destinations"]
+        self.assertEqual(len(server["history"]), 1)
+        self.assertEqual(server["status"], "successful")
+        self.assertEqual(len(cloud["history"]), HISTORY_LIMIT)
+        self.assertEqual(cloud["history"][0]["run_id"], f"b2-failure-{HISTORY_LIMIT}")
+        self.assertEqual(cloud["last_successful_at"], self.now.isoformat())
+        self.assertEqual(self.db.scalar(select(func.count(BackupRun.id))), HISTORY_LIMIT + 3)
+
+    def test_b2_pending_and_integrity_checks_do_not_imply_backup_success(self):
+        platform = self.overview()["platforms"][0]
+        self.assertEqual([d["status"] for d in platform["destinations"]], ["unknown", "pending"])
+        self.report()
+        check = {"check_id": "shared-check", "checked_at": self.now.isoformat(), "status": "passed"}
+        self.assertEqual(self.http("/api/backups/e-learning/checks", "POST", check,
+                                   token=self.tokens["e-learning"])[0], 200)
+        cloud_check = {**check, "destination_kind": "b2", "status": "failed", "error": "B2 check failed"}
+        for _ in range(2):
+            self.assertEqual(self.http("/api/backups/e-learning/checks", "POST", cloud_check,
+                                       token=self.tokens["e-learning"])[0], 200)
+        platform = self.overview()["platforms"][0]
+        server, cloud = platform["destinations"]
+        self.assertEqual(server["integrity_history"][0]["status"], "passed")
+        self.assertEqual(cloud["integrity_history"][0]["status"], "failed")
+        self.assertEqual(cloud["status"], "unknown")
+        self.assertEqual(cloud["history"], [])
+        self.assertEqual(self.db.scalar(select(func.count(BackupCheck.id))), 2)
+
+    def test_reported_contents_are_trimmed_persisted_and_escaped_for_each_page(self):
+        for platform, path in (("e-learning", "/backups/learning"), ("insight", "/backups/apps")):
+            contents = [" /srv/app/uploads ", "/etc/app/config.ini", "Database: app", "<script>bad()</script>"]
+            self.assertEqual(self.report({**self.payload, "contents": contents}, platform=platform)[0], 200)
+            overview = next(p for p in self.overview()["platforms"] if p["key"] == platform)
+            self.assertEqual(overview["latest"]["contents"], [c.strip() for c in contents])
+            self.assertEqual(overview["history"][0]["contents"], overview["latest"]["contents"])
+            html = self.http(path, signed_in=True)[2].decode()
+            self.assertIn("/srv/app/uploads", html)
+            self.assertIn("/etc/app/config.ini", html)
+            self.assertIn("&lt;script&gt;bad()", html)
+            self.assertNotIn("<script>bad()", html)
+        self.assertEqual(self.report(platform="moodle")[0], 200)
+        self.assertEqual(self.overview()["platforms"][2]["latest"]["contents"], [])
+
+    def test_other_apps_do_not_accept_hidden_b2_reports(self):
+        self.assertEqual(self.report({**self.payload, "destination_kind": "b2"}, platform="insight")[0], 422)
+        check = {"check_id": "check", "status": "passed", "destination_kind": "b2",
+                 "checked_at": self.now.isoformat()}
+        self.assertEqual(self.http("/api/backups/asimolog/checks", "POST", check,
+                                   token=self.tokens["asimolog"])[0], 422)
+
+    def test_existing_backup_tables_migrate_without_losing_reports(self):
+        with tempfile.TemporaryDirectory(prefix="keystone-backup-migration-") as directory:
+            engine = create_engine(f"sqlite:///{Path(directory) / 'legacy.db'}")
+            try:
+                Base.metadata.create_all(engine)
+                legacy = MetaData()
+                for model, identifier in ((BackupRun, "run_id"), (BackupCheck, "check_id")):
+                    table = model.__table__
+                    table.drop(engine)
+                    old = Table(table.name, legacy, *[
+                        Column(c.name, c.type, primary_key=c.primary_key, nullable=c.nullable)
+                        for c in table.columns if c.name not in ("destination_kind", "contents")
+                    ], UniqueConstraint("platform", identifier))
+                    for index in table.indexes:
+                        Index(index.name, *(old.c[c.name] for c in index.columns))
+                legacy.create_all(engine)
+                values = _stored_values(BackupReport(**self.payload))
+                values.pop("destination_kind")
+                values.pop("contents")
+                with engine.begin() as conn:
+                    conn.execute(legacy.tables["backup_runs"].insert().values(
+                        id=7, platform="e-learning", received_at=self.now, **values))
+                    conn.execute(legacy.tables["backup_checks"].insert().values(
+                        id=9, platform="e-learning", check_id="legacy-check", status="passed",
+                        checked_at=self.now, received_at=self.now, error=""))
+                with patch("app.seed.engine", engine):
+                    _migrate()
+                    _migrate()
+                with Session(engine) as db:
+                    run = db.get(BackupRun, 7)
+                    self.assertEqual(run.destination_kind, "server")
+                    self.assertEqual(run.contents, [])
+                    self.assertEqual(run.destination, self.payload["destination"])
+                    self.assertEqual(db.get(BackupCheck, 9).destination_kind, "server")
+                    db.add(BackupRun(platform="e-learning", **_stored_values(
+                        BackupReport(**{**self.payload, "destination_kind": "b2", "contents": ["/srv/app"]}))))
+                    db.add(BackupCheck(platform="e-learning", destination_kind="b2",
+                                       check_id="legacy-check", status="failed", checked_at=self.now,
+                                       error="B2 check failed"))
+                    db.commit()
+                engine.dispose()
+                with Session(engine) as db:
+                    self.assertEqual(db.scalar(select(func.count(BackupRun.id))), 2)
+                    self.assertEqual(db.scalar(select(func.count(BackupCheck.id))), 2)
+                    destinations = backup_overview(db, self.now)["platforms"][0]["destinations"]
+                    self.assertEqual(destinations[0]["integrity_history"][0]["status"], "passed")
+                    self.assertEqual(destinations[1]["latest"]["contents"], ["/srv/app"])
+            finally:
+                engine.dispose()
 
 
 if __name__ == "__main__":

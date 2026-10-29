@@ -5,13 +5,17 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.backups import PLATFORMS, backup_overview, backup_size, backup_time, utc
+from app.backups import (
+    LEARNING_PLATFORMS, OTHER_PLATFORMS, PLATFORMS,
+    backup_overview, backup_size, backup_time, utc,
+)
 from app.db import get_db
 from app.deps import require_user
 from app.models import BackupCheck, BackupRun, User
@@ -21,6 +25,8 @@ router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
 Identifier = Annotated[str, Field(min_length=1, max_length=120, pattern=r"^[A-Za-z0-9_.:-]+$")]
 ByteCount = Annotated[int, Field(strict=True, ge=0, le=2**63 - 1)]
+DestinationKind = Literal["server", "b2"]
+BackupContent = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
 
 def require_reporter(
@@ -47,6 +53,7 @@ class BackupReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: Identifier
+    destination_kind: DestinationKind = "server"
     status: Literal["running", "successful", "failed"]
     started_at: AwareDatetime
     completed_at: AwareDatetime | None = None
@@ -54,6 +61,7 @@ class BackupReport(BaseModel):
     next_scheduled_at: AwareDatetime
     overdue_at: AwareDatetime
     destination: Annotated[str, Field(min_length=1, max_length=200)]
+    contents: Annotated[list[BackupContent], Field(max_length=100)] = Field(default_factory=list)
     processed_bytes: ByteCount | None = None
     repository_bytes: ByteCount | None = None
     error: Annotated[str, Field(max_length=4000)] = ""
@@ -90,6 +98,7 @@ class IntegrityReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     check_id: Identifier
+    destination_kind: DestinationKind = "server"
     status: Literal["passed", "failed"]
     checked_at: AwareDatetime
     error: Annotated[str, Field(max_length=4000)] = ""
@@ -116,6 +125,11 @@ def _matches(record: BackupRun | BackupCheck, values: dict) -> bool:
     return all(getattr(record, key) == value for key, value in values.items())
 
 
+def _validate_destination(platform: str, kind: DestinationKind) -> None:
+    if kind == "b2" and platform not in LEARNING_PLATFORMS:
+        raise HTTPException(422, "Backblaze B2 reporting is supported for E-Learning and Moodle only")
+
+
 def _update_run(db: Session, run: BackupRun, values: dict) -> None:
     if _matches(run, values):
         return
@@ -139,9 +153,11 @@ def report_backup(
     payload: BackupReport, platform: str = Depends(require_reporter),
     db: Session = Depends(get_db),
 ):
+    _validate_destination(platform, payload.destination_kind)
     values = _stored_values(payload)
     run = db.scalar(select(BackupRun).where(
         BackupRun.platform == platform, BackupRun.run_id == payload.run_id,
+        BackupRun.destination_kind == payload.destination_kind,
     ))
     if run:
         _update_run(db, run, values)
@@ -154,6 +170,7 @@ def report_backup(
         # Concurrent retries may both have observed an absent run.
         run = db.scalar(select(BackupRun).where(
             BackupRun.platform == platform, BackupRun.run_id == payload.run_id,
+            BackupRun.destination_kind == payload.destination_kind,
         ))
         if run is None:
             raise
@@ -167,9 +184,11 @@ def report_integrity(
     payload: IntegrityReport, platform: str = Depends(require_reporter),
     db: Session = Depends(get_db),
 ):
+    _validate_destination(platform, payload.destination_kind)
     values = _stored_values(payload)
     check = db.scalar(select(BackupCheck).where(
         BackupCheck.platform == platform, BackupCheck.check_id == payload.check_id,
+        BackupCheck.destination_kind == payload.destination_kind,
     ))
     if check:
         if not _matches(check, values):
@@ -182,6 +201,7 @@ def report_integrity(
             db.rollback()
             check = db.scalar(select(BackupCheck).where(
                 BackupCheck.platform == platform, BackupCheck.check_id == payload.check_id,
+                BackupCheck.destination_kind == payload.destination_kind,
             ))
             if check is None:
                 raise
@@ -199,10 +219,19 @@ def backup_statuses(
 
 
 @router.get("/backups")
-def backups_page(
+def backups_page(user: User = Depends(require_user)):
+    return RedirectResponse("/backups/learning", status_code=303, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/backups/{group}")
+def backup_group_page(
+    group: Literal["learning", "apps"],
     request: Request, user: User = Depends(require_user), db: Session = Depends(get_db),
 ):
+    learning = group == "learning"
     return templates.TemplateResponse(request, "backups.html", {
-        "user": user, "nav": "backups", **backup_overview(db),
+        "user": user, "nav": f"backups-{group}", "group": group,
+        "page_title": "E-Learning & Moodle Backups" if learning else "Other App Backups",
+        **backup_overview(db, platform_keys=LEARNING_PLATFORMS if learning else OTHER_PLATFORMS),
         "backup_time": backup_time, "backup_size": backup_size,
     }, headers={"Cache-Control": "no-store"})

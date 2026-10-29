@@ -13,6 +13,9 @@ PLATFORMS = {
     "moodle": "Moodle LMS",
     "asimolog": "AsimoLog",
 }
+LEARNING_PLATFORMS = ("e-learning", "moodle")
+OTHER_PLATFORMS = ("insight", "asimolog")
+DESTINATIONS = {"server": "Server backups", "b2": "Backblaze B2"}
 SAST = ZoneInfo("Africa/Johannesburg")
 HISTORY_LIMIT = 20
 
@@ -48,56 +51,82 @@ def _run_data(run: BackupRun) -> dict:
         "next_scheduled_at": utc(run.next_scheduled_at).isoformat(),
         "overdue_at": utc(run.overdue_at).isoformat(),
         "destination": run.destination, "processed_bytes": run.processed_bytes,
+        "destination_kind": run.destination_kind, "contents": run.contents,
         "repository_bytes": run.repository_bytes, "error": run.error,
         "received_at": utc(run.received_at).isoformat(),
     }
 
 
-def backup_overview(db: Session, now: datetime | None = None) -> dict:
+def _destination_overview(db: Session, key: str, kind: str, now: datetime) -> dict:
+    runs = list(db.scalars(
+        select(BackupRun).where(BackupRun.platform == key, BackupRun.destination_kind == kind)
+        .order_by(BackupRun.started_at.desc(), BackupRun.id.desc()).limit(HISTORY_LIMIT)
+    ))
+    latest = runs[0] if runs else None
+    last_completed = db.scalar(
+        select(BackupRun.completed_at).where(
+            BackupRun.platform == key, BackupRun.destination_kind == kind,
+            BackupRun.completed_at.is_not(None),
+        ).order_by(BackupRun.completed_at.desc()).limit(1)
+    )
+    last_success = db.scalar(
+        select(BackupRun.completed_at).where(
+            BackupRun.platform == key, BackupRun.destination_kind == kind,
+            BackupRun.status == "successful",
+        ).order_by(BackupRun.completed_at.desc()).limit(1)
+    )
+    checks = list(db.scalars(
+        select(BackupCheck).where(BackupCheck.platform == key, BackupCheck.destination_kind == kind)
+        .order_by(BackupCheck.checked_at.desc(), BackupCheck.id.desc()).limit(HISTORY_LIMIT)
+    ))
+    status, reason = "unknown", "No backup reports received."
+    if kind == "b2" and not latest and not checks:
+        status, reason = "pending", "Backblaze B2 backups are still being configured. No backup reports received."
+    if latest:
+        status, reason = latest.status, ""
+        if status == "running":
+            if latest.expected_completion_at and now > utc(latest.expected_completion_at):
+                status, reason = "overdue", "Running backup exceeded its reported completion deadline."
+        elif status == "successful" and now > utc(latest.overdue_at):
+            status, reason = "overdue", "No new run reported by the server's next-backup deadline."
+        elif status == "failed":
+            reason = "The latest backup run failed."
+    return {
+        "kind": kind, "name": DESTINATIONS[kind], "status": status, "reason": reason,
+        "last_completed_at": utc(last_completed).isoformat() if last_completed else None,
+        "last_successful_at": utc(last_success).isoformat() if last_success else None,
+        "latest": _run_data(latest) if latest else None,
+        "history": [_run_data(run) for run in runs],
+        "integrity_history": [{
+            "check_id": check.check_id, "status": check.status,
+            "destination_kind": check.destination_kind,
+            "checked_at": utc(check.checked_at).isoformat(), "error": check.error,
+            "received_at": utc(check.received_at).isoformat(),
+        } for check in checks],
+    }
+
+
+def backup_overview(
+    db: Session, now: datetime | None = None, platform_keys: tuple[str, ...] | None = None,
+) -> dict:
     now = utc(now) if now else datetime.now(timezone.utc)
     platforms = []
     counts = dict.fromkeys(("successful", "failed", "running", "overdue", "unknown"), 0)
+    destination_counts = {**counts, "pending": 0}
     for key, name in PLATFORMS.items():
-        runs = list(db.scalars(
-            select(BackupRun).where(BackupRun.platform == key)
-            .order_by(BackupRun.started_at.desc(), BackupRun.id.desc()).limit(HISTORY_LIMIT)
-        ))
-        latest = runs[0] if runs else None
-        last_completed = db.scalar(
-            select(BackupRun.completed_at).where(
-                BackupRun.platform == key, BackupRun.completed_at.is_not(None),
-            ).order_by(BackupRun.completed_at.desc()).limit(1)
-        )
-        last_success = db.scalar(
-            select(BackupRun.completed_at).where(
-                BackupRun.platform == key, BackupRun.status == "successful",
-            ).order_by(BackupRun.completed_at.desc()).limit(1)
-        )
-        checks = list(db.scalars(
-            select(BackupCheck).where(BackupCheck.platform == key)
-            .order_by(BackupCheck.checked_at.desc(), BackupCheck.id.desc()).limit(HISTORY_LIMIT)
-        ))
-        status, reason = "unknown", "No backup reports received."
-        if latest:
-            status, reason = latest.status, ""
-            if status == "running":
-                if latest.expected_completion_at and now > utc(latest.expected_completion_at):
-                    status, reason = "overdue", "Running backup exceeded its reported completion deadline."
-            elif status == "successful" and now > utc(latest.overdue_at):
-                status, reason = "overdue", "No new run reported by the server's next-backup deadline."
-            elif status == "failed":
-                reason = "The latest backup run failed."
-        counts[status] += 1
+        if platform_keys is not None and key not in platform_keys:
+            continue
+        kinds = ("server", "b2") if key in LEARNING_PLATFORMS else ("server",)
+        destinations = [_destination_overview(db, key, kind, now) for kind in kinds]
+        server = destinations[0]
+        counts[server["status"]] += 1
+        for destination in destinations:
+            destination_counts[destination["status"]] += 1
         platforms.append({
-            "key": key, "name": name, "status": status, "reason": reason,
-            "last_completed_at": utc(last_completed).isoformat() if last_completed else None,
-            "last_successful_at": utc(last_success).isoformat() if last_success else None,
-            "latest": _run_data(latest) if latest else None,
-            "history": [_run_data(run) for run in runs],
-            "integrity_history": [{
-                "check_id": check.check_id, "status": check.status,
-                "checked_at": utc(check.checked_at).isoformat(), "error": check.error,
-                "received_at": utc(check.received_at).isoformat(),
-            } for check in checks],
+            **{field: value for field, value in server.items() if field not in ("kind", "name")},
+            "key": key, "name": name, "destinations": destinations,
         })
-    return {"platforms": platforms, "counts": counts, "generated_at": now.isoformat()}
+    return {
+        "platforms": platforms, "counts": counts, "destination_counts": destination_counts,
+        "generated_at": now.isoformat(),
+    }

@@ -26,6 +26,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Table,
     Text,
@@ -455,10 +456,11 @@ class ChangelogChange(Base):
 
 class BackupRun(Base):
     __tablename__ = "backup_runs"
-    __table_args__ = (UniqueConstraint("platform", "run_id"),)
+    __table_args__ = (UniqueConstraint("platform", "destination_kind", "run_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     platform: Mapped[str] = mapped_column(String(20), index=True)
+    destination_kind: Mapped[str] = mapped_column(String(20), default="server", server_default="server")
     run_id: Mapped[str] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(20))
     started_at: Mapped[datetime] = mapped_column(DateTime, index=True)
@@ -467,6 +469,7 @@ class BackupRun(Base):
     next_scheduled_at: Mapped[datetime] = mapped_column(DateTime)
     overdue_at: Mapped[datetime] = mapped_column(DateTime)
     destination: Mapped[str] = mapped_column(String(200))
+    contents: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     processed_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     repository_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     error: Mapped[str] = mapped_column(Text, default="")
@@ -475,10 +478,11 @@ class BackupRun(Base):
 
 class BackupCheck(Base):
     __tablename__ = "backup_checks"
-    __table_args__ = (UniqueConstraint("platform", "check_id"),)
+    __table_args__ = (UniqueConstraint("platform", "destination_kind", "check_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     platform: Mapped[str] = mapped_column(String(20), index=True)
+    destination_kind: Mapped[str] = mapped_column(String(20), default="server", server_default="server")
     check_id: Mapped[str] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(20))
     checked_at: Mapped[datetime] = mapped_column(DateTime, index=True)

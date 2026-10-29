@@ -3,12 +3,15 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import inspect, select
+from sqlalchemy import MetaData, inspect, select
+from sqlalchemy.schema import CreateTable
 
 from app.changelog import seed_changelog
 from app.db import Base, SessionLocal, engine
 from app.models import (
     Activity,
+    BackupCheck,
+    BackupRun,
     Comment,
     Priority,
     Project,
@@ -133,6 +136,23 @@ def _migrate() -> None:
             if "workbook_path" not in hcols:
                 conn.exec_driver_sql(
                     "ALTER TABLE monthly_hours_cycles ADD COLUMN workbook_path VARCHAR(500)")
+
+        # SQLite needs a table rebuild to scope existing unique IDs by destination.
+        for model in (BackupRun, BackupCheck):
+            table = model.__table__
+            if table.name not in tables:
+                continue
+            columns = [r[1] for r in conn.exec_driver_sql(f"PRAGMA table_info({table.name})")]
+            if "destination_kind" not in columns:
+                replacement = table.to_metadata(MetaData(), name=f"{table.name}_new")
+                conn.execute(CreateTable(replacement))
+                names = ", ".join(columns)
+                conn.exec_driver_sql(
+                    f"INSERT INTO {replacement.name} ({names}) SELECT {names} FROM {table.name}")
+                conn.exec_driver_sql(f"DROP TABLE {table.name}")
+                conn.exec_driver_sql(f"ALTER TABLE {replacement.name} RENAME TO {table.name}")
+                for index in table.indexes:
+                    index.create(conn)
 
 
 def seed() -> None:
